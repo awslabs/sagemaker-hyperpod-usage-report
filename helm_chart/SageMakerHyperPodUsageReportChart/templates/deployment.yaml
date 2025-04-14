@@ -1,0 +1,56 @@
+{{- if not .Values.s3BucketName }}
+{{- fail "A valid .Values.s3BucketName entry is required!" }}
+{{- end }}
+
+{{- if not .Values.clusterName }}
+{{- fail "A valid .Values.clusterName entry is required!" }}
+{{- end }}
+
+
+{{- if not .Values.region }}
+{{- fail "A valid region is required!" }}
+{{- end }}
+
+{{- $region := .Values.region -}}
+
+{{- if not (hasKey .Values.image.repositoryDomainMap $region) -}}
+{{- fail "Unsupported AWS Region" -}}
+{{- end -}}
+
+{{- $_ := set .Values.image "repository" (index .Values.image.repositoryDomainMap $region) -}}
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "sagemaker-hyperpod-usage-report.fullname" . }}
+  labels:
+    {{- include "sagemaker-hyperpod-usage-report.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "sagemaker-hyperpod-usage-report.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "sagemaker-hyperpod-usage-report.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ include "sagemaker-hyperpod-usage-report.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}/usagereportoperator:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: AWS_REGION
+              value: {{ .Values.region }}
+            - name: CLUSTER_NAME
+              value: {{ .Values.clusterName }}
+            - name: BUCKET_NAME
+              value: {{ .Values.s3BucketName }}
+
