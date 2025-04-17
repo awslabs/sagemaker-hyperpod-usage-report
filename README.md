@@ -37,7 +37,78 @@ Configuration parameters:
 ### Step 2: Install Helm Chart
 [Add instructions for installing the Helm chart]
 
-### Step 3: Report Generation
+### Step 3: Setup Pod Identity
+The Helm chart creates a Kubernetes service account `sagemaker-hyperpod-usage-report-service-account`. 
+We need to create a pod identity association to allow the service account to put resource usage data in the S3 bucket.
+
+
+1. Make sure the `eks-auth:AssumeRoleForPodIdentity` permission exists in the IAM execution role for the SageMaker HyperPod cluster.
+2. If the `eks-pod-identity-agent` add-on is not already installed on your EKS cluster, install the add-on on the EKS cluster.
+```
+aws eks create-addon \
+    --cluster-name <eks-cluster-name> \
+    --addon-name eks-pod-identity-agent
+```
+3. Create a `trust-relationship.json` file for a new role for pods to call S3 APIs.
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowEksAuthToAssumeRoleForPodIdentity",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "pods.eks.amazonaws.com"
+            },
+            "Action": [
+                "sts:AssumeRole",
+                "sts:TagSession"
+            ]
+        }
+    ]
+}
+```
+4. Create a new IAM role to be assumed by the Kubernetes service account and attach the trust relationship.
+```
+aws iam create-role --role-name hyperpod-usage-report-service-account-role \
+    --assume-role-policy-document file://trust-relationship.json \
+    --description "allow pods to put data in s3"
+```
+5. Create the following policy that grants pods access to put resource usage data in S3.
+   Please use the name of the bucket created by the CloudFormation template in Step 1 in "Resource".
+```
+cat >hyperpod-usage-report-policy.json <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject"
+            ],
+            "Resource": "arn:aws:s3:::<usage-report-s3-bucket_name>"
+        }
+    ]
+}
+EOF
+```
+6. Attach the `hyperpod-usage-report-policy` policy to the `hyperpod-usage-report-service-account-role` using the policy document saved in the previous step.
+```
+aws iam put-role-policy \
+  --role-name hyperpod-usage-report-service-account-role \
+  --policy-name hyperpod-usage-report-policy \
+  --policy-document file://hyperpod-usage-report-policy.json
+```
+7. Create a pod identity association.
+```
+aws eks create-pod-identity-association \
+    --cluster-name EKS_CLUSTER_NAME \
+    --role-arn arn:aws:iam::<account-id>:hyperpod-usage-report-service-account-role \
+    --namespace default \
+    --service-account sagemaker-hyperpod-usage-report-service-account
+```
+
+### Step 4: Report Generation
 Generate usage reports using the following command:
 
 ```bash
