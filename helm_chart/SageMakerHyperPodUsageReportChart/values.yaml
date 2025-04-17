@@ -13,7 +13,7 @@ image:
     sa-east-1: 985539796278.dkr.ecr.sa-east-1.amazonaws.com
     us-west-1: 034362067326.dkr.ecr.us-west-1.amazonaws.com
     ap-southeast-1: 235494799058.dkr.ecr.ap-southeast-1.amazonaws.com
-    us-west-2: 897729117101.dkr.ecr.us-west-2.amazonaws.com
+    us-west-2: 586794468202.dkr.ecr.us-west-2.amazonaws.com
     eu-west-2: 869935108213.dkr.ecr.eu-west-2.amazonaws.com
     ap-southeast-4: 872515262625.dkr.ecr.ap-southeast-4.amazonaws.com
     ap-southeast-3: 112551748145.dkr.ecr.ap-southeast-3.amazonaws.com
