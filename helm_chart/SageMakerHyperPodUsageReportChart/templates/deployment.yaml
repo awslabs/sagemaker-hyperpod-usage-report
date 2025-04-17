@@ -38,9 +38,11 @@ spec:
         {{- include "sagemaker-hyperpod-usage-report.selectorLabels" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "sagemaker-hyperpod-usage-report.serviceAccountName" . }}
+      nodeSelector:
+        sagemaker.amazonaws.com/compute-type: "hyperpod"
       containers:
         - name: {{ .Chart.Name }}
-          image: "{{ .Values.image.repository }}/usagereportoperator:{{ .Values.image.tag }}"
+          image: "{{ .Values.image.repository }}/usage-report-operator:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: NAMESPACE
