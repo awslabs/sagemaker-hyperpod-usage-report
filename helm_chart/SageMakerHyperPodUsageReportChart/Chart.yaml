@@ -1,5 +1,5 @@
 apiVersion: v2
-name: sagemaker-hyperpod-usage-report-chart
+name: sagemaker-hyperpod-usage-report
 description: A simple Kubernetes operator that collects usage report data and stores it in the S3 bucket
 version: 0.1.0
 appVersion: "1.0.0"
