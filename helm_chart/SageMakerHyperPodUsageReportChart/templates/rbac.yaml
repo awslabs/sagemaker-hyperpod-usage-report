@@ -29,5 +29,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ include "sagemaker-hyperpod-usage-report.serviceAccountName" . }}
-    namespace: {{ .Release.Namespace }}
+    namespace: {{ include "sagemaker-hyperpod-usage-report.namespace" . }}
 {{- end }}

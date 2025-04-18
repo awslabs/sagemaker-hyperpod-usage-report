@@ -25,6 +25,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "sagemaker-hyperpod-usage-report.fullname" . }}
+  namespace: {{ include "sagemaker-hyperpod-usage-report.namespace" . }}
   labels:
     {{- include "sagemaker-hyperpod-usage-report.labels" . | nindent 4 }}
 spec:
