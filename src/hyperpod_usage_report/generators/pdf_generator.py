@@ -57,11 +57,11 @@ class PDFReportGenerator(BaseReportGenerator):
             "Task",
             "Instance",
             "Status",
-            "Total\nutilization\n(hour)",
+            "Total\nutilization\n(hours)",
             "Total\nutilization\n(count)",
-            "Total\nutilization\n(hour)",
+            "Total\nutilization\n(hours)",
             "Total\nutilization\n(count)",
-            "Total\nutilization\n(hour)",
+            "Total\nutilization\n(hours)",
             "Total\nutilization\n(count)",
             "Priority class",
         ]
@@ -92,15 +92,15 @@ class PDFReportGenerator(BaseReportGenerator):
             "Namespace",
             "Team",
             "Type",
-            "Total\nutilization\n(hour)",
-            "Allocated\nutilization\n(hour)",
-            "Borrowed\nutilization\n(hour)",
-            "Total\nutilization\n(hour)",
-            "Allocated\nutilization\n(hour)",
-            "Borrowed\nutilization\n(hour)",
-            "Total\nutilization\n(hour)",
-            "Allocated\nutilization\n(hour)",
-            "Borrowed\nutilization\n(hour)",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
         ]
 
     def _create_pdf(self) -> FPDF:
@@ -115,7 +115,9 @@ class PDFReportGenerator(BaseReportGenerator):
         y_start = pdf.get_y()
 
         # Print the cell content
-        pdf.multi_cell(width, height / 3 if "\n" in text else height, text, 0, "C", True)
+        pdf.multi_cell(
+            width, height / 3 if "\n" in text else height, text, 0, "C", True
+        )
 
         # Return to the right of the cell
         pdf.set_xy(x_start + width, y_start)
@@ -123,11 +125,16 @@ class PDFReportGenerator(BaseReportGenerator):
         # Draw the border
         pdf.rect(x_start, y_start, width, height)
 
-    def _add_report_header(self, pdf: FPDF, header_info: Dict[str, Any]) -> None:
+    def _add_report_header(
+        self, pdf: FPDF, header_info: Dict[str, Any], missing_periods: list
+    ) -> None:
         """Add report header with title and metadata"""
         # Title
         pdf.set_font(*PDFStyle.TITLE_FONT)
-        pdf.cell(0, 10, f"ClusterName: {header_info['cluster_name']}", ln=True, align="C")
+        pdf.cell(0, 10, f"Amazon SageMaker HyperPod", ln=True, align="C")
+        pdf.cell(
+            0, 10, f"ClusterName: {header_info['cluster_name']}", ln=True, align="C"
+        )
         pdf.ln(5)
 
         # First separator
@@ -139,8 +146,12 @@ class PDFReportGenerator(BaseReportGenerator):
         metadata_lines = [
             f"Type: {header_info['report_type'].title()} Utilization Report",
             f"Date Generated: {header_info['report_date']}",
-            f"Date Range: {header_info['start_date']} to {header_info['end_date']}",
+            f"Date Range (UTC): {header_info['start_date']} to {header_info['end_date']}",
         ]
+        if missing_periods != []:
+            metadata_lines.append(f"Missing data periods")
+            for period in missing_periods:
+                metadata_lines.append(f"{period['start_time']} to {period['end_time']}")
         for line in metadata_lines:
             pdf.cell(0, 10, line, ln=True, align="C")
         pdf.ln(5)
@@ -150,7 +161,11 @@ class PDFReportGenerator(BaseReportGenerator):
         pdf.ln(5)
 
     def _add_table_headers(
-        self, pdf: FPDF, columns: List[ColumnConfig], headers: List[str], is_detailed: bool
+        self,
+        pdf: FPDF,
+        columns: List[ColumnConfig],
+        headers: List[str],
+        is_detailed: bool,
     ) -> None:
         """Add table headers with correct group formatting"""
         pdf.set_fill_color(*PDFStyle.HEADER_BG_COLOR)
@@ -185,7 +200,9 @@ class PDFReportGenerator(BaseReportGenerator):
             self.header_cell(pdf, col.width, 15, header)
         pdf.ln(15)
 
-    def _add_table_content(self, pdf: FPDF, df: pd.DataFrame, columns: List[ColumnConfig]) -> None:
+    def _add_table_content(
+        self, pdf: FPDF, df: pd.DataFrame, columns: List[ColumnConfig]
+    ) -> None:
         """Add table content rows"""
         pdf.set_font(*PDFStyle.CONTENT_FONT)
         for _, row in df.iterrows():
@@ -211,24 +228,39 @@ class PDFReportGenerator(BaseReportGenerator):
         columns: List[ColumnConfig],
         headers: List[str],
         is_detailed: bool,
+        missing_periods: list,
     ) -> str:
         """Generate a PDF report with the specified format"""
         output_file = self._get_output_filename(header_info)
         pdf = self._create_pdf()
-        self._add_report_header(pdf, header_info)
+        self._add_report_header(pdf, header_info, missing_periods)
         self._add_table_headers(pdf, columns, headers, is_detailed)
         self._add_table_content(pdf, df, columns)
         pdf.output(output_file)
         return output_file
 
-    def generate_detailed_report(self, df: pd.DataFrame, header_info: Dict[str, Any]) -> str:
+    def generate_detailed_report(
+        self, df: pd.DataFrame, header_info: Dict[str, Any], missing_periods: list
+    ) -> str:
         """Generate a detailed PDF report"""
         return self._generate_report(
-            df, header_info, self.detailed_columns, self.detailed_table_headers, True
+            df,
+            header_info,
+            self.detailed_columns,
+            self.detailed_table_headers,
+            True,
+            missing_periods,
         )
 
-    def generate_summary_report(self, df: pd.DataFrame, header_info: Dict[str, Any]) -> str:
+    def generate_summary_report(
+        self, df: pd.DataFrame, header_info: Dict[str, Any], missing_periods: list
+    ) -> str:
         """Generate a summary PDF report"""
         return self._generate_report(
-            df, header_info, self.summary_columns, self.summary_table_headers, False
+            df,
+            header_info,
+            self.summary_columns,
+            self.summary_table_headers,
+            False,
+            missing_periods,
         )

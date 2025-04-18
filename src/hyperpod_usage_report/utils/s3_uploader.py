@@ -13,7 +13,7 @@ class S3Uploader:
 
             s3_client.upload_file(file_path, bucket, key)
             print(
-                f"Report uploaded successfully to {output_location}/{os.path.basename(file_path)}"
+                f"Report uploaded successfully to {output_location}{os.path.basename(file_path)}"
             )
         except Exception as e:
             print(f"Error uploading to S3: {str(e)}")

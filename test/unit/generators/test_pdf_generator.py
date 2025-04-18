@@ -67,6 +67,16 @@ def header_info():
 
 
 @pytest.fixture
+def empty_missing_periods():
+    return []
+
+
+@pytest.fixture
+def missing_periods():
+    return [{"start_time": "start_time", "end_time": "end_time"}]
+
+
+@pytest.fixture
 def mock_pdf():
     with patch("fpdf.FPDF") as mock:
         yield mock.return_value
@@ -100,9 +110,9 @@ def test_get_output_filename(header_info):
     assert filename == "summary-report-2025-03-25-2025-03-31.pdf"
 
 
-def test_add_report_header(mock_pdf, header_info):
+def test_add_report_header(mock_pdf, header_info, empty_missing_periods):
     generator = PDFReportGenerator()
-    generator._add_report_header(mock_pdf, header_info)
+    generator._add_report_header(mock_pdf, header_info, empty_missing_periods)
 
     assert mock_pdf.set_font.called
     assert mock_pdf.cell.called
@@ -111,20 +121,40 @@ def test_add_report_header(mock_pdf, header_info):
     assert any("Summary" in str(call) for call in calls)
 
 
-@patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
-def test_generate_summary_report(mock_fpdf, summary_df, header_info):
+def test_add_report_header_with_missing_periods(mock_pdf, header_info, missing_periods):
     generator = PDFReportGenerator()
-    output_file = generator.generate_summary_report(summary_df, header_info)
+    generator._add_report_header(mock_pdf, header_info, missing_periods)
+
+    assert mock_pdf.set_font.called
+    assert mock_pdf.cell.called
+    calls = mock_pdf.cell.call_args_list
+    assert any("test-cluster" in str(call) for call in calls)
+    assert any("Summary" in str(call) for call in calls)
+    assert any("start_time" in str(call) for call in calls)
+
+
+@patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
+def test_generate_summary_report(
+    mock_fpdf, summary_df, header_info, empty_missing_periods
+):
+    generator = PDFReportGenerator()
+    output_file = generator.generate_summary_report(
+        summary_df, header_info, empty_missing_periods
+    )
 
     assert output_file == "summary-report-2025-03-25.pdf"
     mock_fpdf.return_value.output.assert_called_once_with(output_file)
 
 
 @patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
-def test_generate_detailed_report(mock_fpdf, detailed_df, header_info):
+def test_generate_detailed_report(
+    mock_fpdf, detailed_df, header_info, empty_missing_periods
+):
     generator = PDFReportGenerator()
     header_info["report_type"] = "detailed"
-    output_file = generator.generate_detailed_report(detailed_df, header_info)
+    output_file = generator.generate_detailed_report(
+        detailed_df, header_info, empty_missing_periods
+    )
 
     assert output_file == "detailed-report-2025-03-25.pdf"
     mock_fpdf.return_value.output.assert_called_once_with(output_file)
@@ -163,7 +193,9 @@ def test_formatter_functions():
     generator = PDFReportGenerator()
 
     # Test date formatter
-    date_col = next(col for col in generator.summary_columns if col.name == "report_date")
+    date_col = next(
+        col for col in generator.summary_columns if col.name == "report_date"
+    )
     formatted_date = date_col.formatter(datetime.strptime("2025-03-25", "%Y-%m-%d"))
     assert formatted_date == "2025-03-25"
 
@@ -178,12 +210,14 @@ def test_formatter_functions():
 
 
 @patch("fpdf.FPDF")
-def test_multiple_day_report(mock_fpdf, summary_df, header_info):
+def test_multiple_day_report(mock_fpdf, summary_df, header_info, empty_missing_periods):
     generator = PDFReportGenerator()
     header_info["days"] = 7
     header_info["end_date"] = "2025-03-31"
 
-    output_file = generator.generate_summary_report(summary_df, header_info)
+    output_file = generator.generate_summary_report(
+        summary_df, header_info, empty_missing_periods
+    )
     assert output_file == "summary-report-2025-03-25-2025-03-31.pdf"
     os.remove(output_file)
 

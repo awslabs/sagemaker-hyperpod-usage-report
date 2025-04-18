@@ -9,17 +9,20 @@ class CSVReportGenerator(BaseReportGenerator):
         time_period = f"{header_info['start_date']} to {header_info['end_date']}"
 
         return [
+            "Amazon SageMaker HyperPod",
             f"ClusterName: {header_info['cluster_name']}",
             f"Type: {header_info['report_type'].title()} Utilization Report",
             f"Date Generated: {header_info['report_date']}",
-            f"Date Range: {time_period}",
+            f"Date Range (UTC): {time_period}",
         ]
 
-    def generate_summary_report(self, df: pd.DataFrame, header_info: dict) -> str:
+    def generate_summary_report(
+        self, df: pd.DataFrame, header_info: dict, missing_periods: list
+    ) -> str:
         """Generate CSV Summary report"""
         base_name = f"{header_info['report_type']}-report-{header_info['start_date']}"
         output_file = (
-            f"{base_name}-{header_info['end_date']}.pdf"
+            f"{base_name}-{header_info['end_date']}.csv"
             if int(header_info["days"]) > 1
             else f"{base_name}.csv"
         )
@@ -56,6 +59,11 @@ class CSVReportGenerator(BaseReportGenerator):
             for row in self.generate_report_header(header_info):
                 f.write(f"{row}\n")
 
+            if missing_periods != []:
+                f.write(f"Missing data periods\n")
+                for period in missing_periods:
+                    f.write(f"{period['start_time']} to {period['end_time']}\n")
+
             for header_row in resource_headers:
                 f.write(f"{header_row}\n")
 
@@ -80,11 +88,13 @@ class CSVReportGenerator(BaseReportGenerator):
 
         return output_file
 
-    def generate_detailed_report(self, df: pd.DataFrame, header_info: dict) -> str:
+    def generate_detailed_report(
+        self, df: pd.DataFrame, header_info: dict, missing_periods: list
+    ) -> str:
         """Generate CSV Detailed report"""
         base_name = f"{header_info['report_type']}-report-{header_info['start_date']}"
         output_file = (
-            f"{base_name}-{header_info['end_date']}.pdf"
+            f"{base_name}-{header_info['end_date']}.csv"
             if int(header_info["days"]) > 1
             else f"{base_name}.csv"
         )
@@ -92,9 +102,9 @@ class CSVReportGenerator(BaseReportGenerator):
         # Column headers (multi-level)
         resource_headers = [
             ",,,,,,NeuronCore,,GPU,,vCPU,,",
-            "Date,Namespace,Team,Task,Instance,Status,Total utilization (hour),"
-            + "Total utilization (count),Total utilization (hour),Total utilization (count),"
-            + "Total utilization (hour),Total utilization (count),Priority class",
+            "Date,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
+            + "Total utilization (count),Total utilization (hours),Total utilization (count),"
+            + "Total utilization (hours),Total utilization (count),Priority class",
         ]
 
         # Reorder DataFrame columns to match desired output
@@ -120,6 +130,11 @@ class CSVReportGenerator(BaseReportGenerator):
         with open(output_file, "w") as f:
             for row in self.generate_report_header(header_info):
                 f.write(f"{row}\n")
+
+            if missing_periods != []:
+                f.write(f"Missing data periods\n")
+                for period in missing_periods:
+                    f.write(f"{period['start_time']} to {period['end_time']}\n")
 
             for header_row in resource_headers:
                 f.write(f"{header_row}\n")

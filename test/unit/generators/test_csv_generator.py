@@ -61,14 +61,20 @@ def header_info():
     }
 
 
+@pytest.fixture
+def empty_missing_periods():
+    return []
+
+
 def test_generate_report_header(header_info):
     # Arrange
     generator = CSVReportGenerator()
     expected_header = [
+        "Amazon SageMaker HyperPod",
         "ClusterName: test-cluster",
         "Type: Summary Utilization Report",
         "Date Generated: 2025-03-25",
-        "Date Range: 2025-03-25 to 2025-03-25",
+        "Date Range (UTC): 2025-03-25 to 2025-03-25",
     ]
 
     # Act
@@ -78,7 +84,9 @@ def test_generate_report_header(header_info):
     assert header == expected_header
 
 
-def test_generate_summary_report_single_day(summary_df, header_info):
+def test_generate_summary_report_single_day(
+    summary_df, header_info, empty_missing_periods
+):
     # Arrange
     generator = CSVReportGenerator()
     expected_filename = "summary-report-2025-03-25.csv"
@@ -86,31 +94,39 @@ def test_generate_summary_report_single_day(summary_df, header_info):
 
     # Act
     with patch("builtins.open", m):
-        output_file = generator.generate_summary_report(summary_df, header_info)
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
 
     # Assert
     assert output_file == expected_filename
     m.assert_called_once_with(expected_filename, "w")
 
 
-def test_generate_summary_report_multiple_days(summary_df, header_info):
+def test_generate_summary_report_multiple_days(
+    summary_df, header_info, empty_missing_periods
+):
     # Arrange
     generator = CSVReportGenerator()
     header_info["days"] = 7
     header_info["end_date"] = "2025-03-31"
-    expected_filename = "summary-report-2025-03-25-2025-03-31.pdf"
+    expected_filename = "summary-report-2025-03-25-2025-03-31.csv"
     m = mock_open()
 
     # Act
     with patch("builtins.open", m):
-        output_file = generator.generate_summary_report(summary_df, header_info)
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
 
     # Assert
     assert output_file == expected_filename
     m.assert_called_once_with(expected_filename, "w")
 
 
-def test_generate_detailed_report_single_day(detailed_df, header_info):
+def test_generate_detailed_report_single_day(
+    detailed_df, header_info, empty_missing_periods
+):
     # Arrange
     generator = CSVReportGenerator()
     header_info["report_type"] = "detailed"
@@ -119,47 +135,57 @@ def test_generate_detailed_report_single_day(detailed_df, header_info):
 
     # Act
     with patch("builtins.open", m):
-        output_file = generator.generate_detailed_report(detailed_df, header_info)
+        output_file = generator.generate_detailed_report(
+            detailed_df, header_info, empty_missing_periods
+        )
 
     # Assert
     assert output_file == expected_filename
     m.assert_called_once_with(expected_filename, "w")
 
 
-def test_generate_detailed_report_multiple_days(detailed_df, header_info):
+def test_generate_detailed_report_multiple_days(
+    detailed_df, header_info, empty_missing_periods
+):
     # Arrange
     generator = CSVReportGenerator()
     header_info["report_type"] = "detailed"
     header_info["days"] = 7
     header_info["end_date"] = "2025-03-31"
-    expected_filename = "detailed-report-2025-03-25-2025-03-31.pdf"
+    expected_filename = "detailed-report-2025-03-25-2025-03-31.csv"
     m = mock_open()
 
     # Act
     with patch("builtins.open", m):
-        output_file = generator.generate_detailed_report(detailed_df, header_info)
+        output_file = generator.generate_detailed_report(
+            detailed_df, header_info, empty_missing_periods
+        )
 
     # Assert
     assert output_file == expected_filename
     m.assert_called_once_with(expected_filename, "w")
 
 
-def test_summary_report_content(summary_df, header_info):
+def test_summary_report_content(summary_df, header_info, empty_missing_periods):
     # Arrange
     generator = CSVReportGenerator()
     m = mock_open()
 
     # Act
     with patch("builtins.open", m) as mock_file:
-        generator.generate_summary_report(summary_df, header_info)
+        generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
 
     # Assert
     write_calls = [call.args[0] for call in mock_file().write.call_args_list]
     assert any("ClusterName: test-cluster\n" in call for call in write_calls)
-    assert any("2025-03-25,test-namespace,test-team,t2.micro" in call for call in write_calls)
+    assert any(
+        "2025-03-25,test-namespace,test-team,t2.micro" in call for call in write_calls
+    )
 
 
-def test_detailed_report_content(detailed_df, header_info):
+def test_detailed_report_content(detailed_df, header_info, empty_missing_periods):
     # Arrange
     generator = CSVReportGenerator()
     header_info["report_type"] = "detailed"
@@ -167,9 +193,13 @@ def test_detailed_report_content(detailed_df, header_info):
 
     # Act
     with patch("builtins.open", m) as mock_file:
-        generator.generate_detailed_report(detailed_df, header_info)
+        generator.generate_detailed_report(
+            detailed_df, header_info, empty_missing_periods
+        )
 
     # Assert
     write_calls = [call.args[0] for call in mock_file().write.call_args_list]
     assert any("ClusterName: test-cluster\n" in call for call in write_calls)
-    assert any("2025-03-25,test-namespace,test-team,test-task" in call for call in write_calls)
+    assert any(
+        "2025-03-25,test-namespace,test-team,test-task" in call for call in write_calls
+    )
