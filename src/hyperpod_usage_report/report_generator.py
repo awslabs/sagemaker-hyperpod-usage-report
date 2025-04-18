@@ -1,9 +1,10 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict
 
 import awswrangler as wr
+import pandas as pd
 
 from hyperpod_usage_report.generators.csv_generator import CSVReportGenerator
 from hyperpod_usage_report.generators.pdf_generator import PDFReportGenerator
@@ -47,12 +48,14 @@ class ReportGenerator:
         self.format = format
         self.cluster_name = cluster_name
 
-        self.generator = CSVReportGenerator() if format.lower() == "csv" else PDFReportGenerator()
+        self.generator = (
+            CSVReportGenerator() if format.lower() == "csv" else PDFReportGenerator()
+        )
 
     def _fetch_data(self):
         """Fetches required data for report generation"""
         try:
-            query = QueryBuilder.build_query(
+            query = QueryBuilder.build_fetch_report_data_query(
                 self.report_type,
                 self.start_date.strftime("%Y-%m-%d"),
                 self.end_date.strftime("%Y-%m-%d"),
@@ -74,16 +77,26 @@ class ReportGenerator:
         }
 
     def _generate_report_by_type(
-        self, df: Any, header_info: Dict[str, str], report_type: ReportType
+        self,
+        df: Any,
+        header_info: Dict[str, str],
+        report_type: ReportType,
+        missing_periods: list,
     ) -> str:
         """Generates the appropriate type of report"""
         try:
             if report_type == ReportType.SUMMARY:
-                return self.generator.generate_summary_report(df, header_info)
+                return self.generator.generate_summary_report(
+                    df, header_info, missing_periods
+                )
             elif report_type == ReportType.DETAILED:
-                return self.generator.generate_detailed_report(df, header_info)
+                return self.generator.generate_detailed_report(
+                    df, header_info, missing_periods
+                )
         except Exception as e:
-            raise ReportGenerationError(f"Failed to generate {report_type.value} report: {str(e)}")
+            raise ReportGenerationError(
+                f"Failed to generate {report_type.value} report: {str(e)}"
+            )
 
     def _upload_and_cleanup(self, output_file: str) -> None:
         """Uploads the generated report to S3"""
@@ -92,6 +105,62 @@ class ReportGenerator:
             print(f"Successfully uploaded report to {self.output_location}")
         except Exception as e:
             raise S3UploadError(f"Failed to upload report: {str(e)}")
+
+    def _find_missing_period(self) -> list:
+        """Find missing periods from cluster usage collector"""
+        all_hours = list(range(24))
+        results = []
+        try:
+            query = QueryBuilder.build_fetch_heartdub_query(
+                self.start_date.strftime("%Y-%m-%d"),
+                self.end_date.strftime("%Y-%m-%d"),
+            )
+            df = wr.athena.read_sql_query(sql=query, database=self.database_name)
+        except Exception as e:
+            print(f"Error fetching data: {str(e)}")
+            raise
+        if df.empty:
+            start_time = datetime.combine(self.start_date.date(), datetime.min.time())
+            end_time = datetime.combine(
+                (self.end_date + timedelta(days=1)).date(), datetime.min.time()
+            )
+            return [
+                {
+                    "start_time": start_time,
+                    "end_time": end_time,
+                }
+            ]
+        df["hour"] = df["hour"].astype(int)
+        df["date"] = pd.to_datetime(
+            df[["year", "month", "day"]].astype(str).agg("-".join, axis=1)
+        )
+
+        for (_, day), group in df.groupby(["cluster", "date"]):
+            existing_hours = sorted(group["hour"].unique())
+            missing_hours = sorted(set(all_hours) - set(existing_hours))
+
+            if missing_hours:
+                current_start = missing_hours[0]
+                prev = current_start
+
+                for h in missing_hours[1:] + [None]:
+                    if h is None or h != prev + 1:
+                        start_time = datetime.combine(
+                            day.date(), datetime.min.time()
+                        ) + timedelta(hours=current_start)
+                        end_time = datetime.combine(
+                            day.date(), datetime.min.time()
+                        ) + timedelta(hours=prev + 1)
+                        results.append(
+                            {
+                                "start_time": start_time,
+                                "end_time": end_time,
+                            }
+                        )
+                        if h is not None:
+                            current_start = h
+                    prev = h
+        return results
 
     def generate_report(self):
         output_file = None
@@ -103,8 +172,13 @@ class ReportGenerator:
             df = self._fetch_data()
             header_info = self._prepare_header_info()
 
+            # Fetch missing date period
+            missing_periods = self._find_missing_period()
+
             # Generate appropriate report
-            output_file = self._generate_report_by_type(df, header_info, report_type)
+            output_file = self._generate_report_by_type(
+                df, header_info, report_type, missing_periods
+            )
 
             # Upload and cleanup
             self._upload_and_cleanup(output_file)

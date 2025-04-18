@@ -362,6 +362,39 @@ Resources:
               Type: string
             - Name: cluster
               Type: string
+  HeartdubTable:
+    Type: AWS::Glue::Table
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseName: !Ref UsageReportDatabase
+      TableInput:
+        Name: 'heartdub'
+        Description: 'Image heartdub table for tracking connections'
+        TableType: EXTERNAL_TABLE
+        Parameters: {
+          "classification": "parquet",
+          "parquet.compression": "SNAPPY"
+        }
+        StorageDescriptor:
+          Location: !Sub 's3://${UsageReportBucket}/raw/heartdub/'
+          InputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat
+          OutputFormat: org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat
+          SerdeInfo:
+            SerializationLibrary: org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe
+          Columns:
+            - Name: timestamp
+              Type: timestamp
+            - Name: cluster
+              Type: string
+        PartitionKeys:
+          - Name: year
+            Type: string
+          - Name: month
+            Type: string
+          - Name: day
+            Type: string
+          - Name: hour
+            Type: string
   AggregationRule:
     Type: AWS::Events::Rule
     Properties:
@@ -392,7 +425,6 @@ Resources:
         Statement:
         - Effect: Allow
           Action:
-          - "s3:DeleteObject"
           - "s3:GetObject"
           - "s3:PutObject"
           Resource:
@@ -403,8 +435,6 @@ Resources:
             - athena:GetQueryExecution
           Resource:
           - '*'
-  # TODO: simplify the lambda code
-  # TODO: optimize the lambda to multi-threading, and stress test
   AggregationLambda:
     Type: AWS::Lambda::Function
     Properties:
