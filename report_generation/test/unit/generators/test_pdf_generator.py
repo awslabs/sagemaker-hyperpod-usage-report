@@ -5,11 +5,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from hyperpod_usage_report.generators.pdf_generator import (
-    ColumnConfig,
-    PDFReportGenerator,
-    PDFStyle,
-)
+from src.hyperpod_usage_report.generators.pdf_generator import (
+    ColumnConfig, PDFReportGenerator, PDFStyle)
 
 
 @pytest.fixture
@@ -39,6 +36,8 @@ def detailed_df():
         {
             "report_date": [datetime.strptime("2025-03-25", "%Y-%m-%d")],
             "namespace": ["test-namespace"],
+            "period_start": [datetime.strptime("20:00:00", "%H:%M:%S")],
+            "period_end": [datetime.strptime("21:00:00", "%H:%M:%S")],
             "team": ["test-team"],
             "task_name": ["test-task"],
             "instance": ["instance-1"],
@@ -50,6 +49,7 @@ def detailed_df():
             "utilized_vcpu_hours": [3.0],
             "utilized_vcpu_count": [4],
             "priority_class": ["high"],
+            "labels": [""],
         }
     )
 
@@ -91,7 +91,7 @@ def test_column_config_initialization():
     assert generator.summary_columns[0].name == "report_date"
 
     # Test detailed columns
-    assert len(generator.detailed_columns) == 13
+    assert len(generator.detailed_columns) == 16
     assert isinstance(generator.detailed_columns[0], ColumnConfig)
     assert generator.detailed_columns[0].name == "report_date"
 
@@ -133,7 +133,7 @@ def test_add_report_header_with_missing_periods(mock_pdf, header_info, missing_p
     assert any("start_time" in str(call) for call in calls)
 
 
-@patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
 def test_generate_summary_report(
     mock_fpdf, summary_df, header_info, empty_missing_periods
 ):
@@ -146,7 +146,7 @@ def test_generate_summary_report(
     mock_fpdf.return_value.output.assert_called_once_with(output_file)
 
 
-@patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
 def test_generate_detailed_report(
     mock_fpdf, detailed_df, header_info, empty_missing_periods
 ):

@@ -22,7 +22,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub "${AWS::AccountId}-${AWS::Region}-${EKSClusterName}-usage-report"
+      BucketName: !Sub "${AWS::AccountId}-${AWS::Region}-usage-report"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -107,6 +107,8 @@ Resources:
               Type: timestamp
             - Name: namespace
               Type: string
+            - Name: resource_version
+              Type: string
             - Name: team
               Type: string
             - Name: gpu_total
@@ -160,6 +162,8 @@ Resources:
               Type: timestamp
             - Name: namespace
               Type: string
+            - Name: resource_version
+              Type: string
             - Name: team
               Type: string
             - Name: status
@@ -178,6 +182,8 @@ Resources:
               Type: boolean
             - Name: finished
               Type: boolean
+            - Name: labels
+              Type: array<string>
         PartitionKeys:
             - Name: year
               Type: string
@@ -217,6 +223,8 @@ Resources:
               Type: timestamp
             - Name: namespace
               Type: string
+            - Name: resource_version
+              Type: string
             - Name: status
               Type: string
             - Name: owner
@@ -235,6 +243,8 @@ Resources:
               Type: double
             - Name: priority_class
               Type: string
+            - Name: labels
+              Type: array<string>
         PartitionKeys:
             - Name: year
               Type: string
@@ -270,6 +280,10 @@ Resources:
           Columns:
             - Name: report_date
               Type: date
+            - Name: period_start
+              Type: timestamp
+            - Name: period_end
+              Type: timestamp
             - Name: namespace
               Type: string
             - Name: team
@@ -296,6 +310,8 @@ Resources:
               Type: double
             - Name: priority_class
               Type: string
+            - Name: labels
+              Type: array<string>
         PartitionKeys:
             - Name: year
               Type: string
@@ -458,11 +474,18 @@ Resources:
             class QueryTemplates:
                 CRESCENDO_SUMMARY = """
                   INSERT into ${AthenaDBName}.summary_report
-                  WITH resource_states AS (
-                  SELECT 
-                      *
+                  WITH latest_version_resource_states AS (
+                    SELECT *
+                    FROM (
+                      SELECT
+                        *,
+                        ROW_NUMBER() OVER (
+                          PARTITION BY instance_type, timestamp, namespace, team
+                          ORDER BY CAST(resource_version AS bigint) DESC
+                        ) AS row_num
                       FROM ${AthenaDBName}.clusterqueue
-                      WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
+                    ) ranked
+                    WHERE row_num = 1 AND year = '{year}' AND month = '{month}' AND day = '{day}'
                   ),
                   resource_periods AS (
                       SELECT DISTINCT
@@ -493,7 +516,7 @@ Resources:
                           neuron_core_total,
                           neuron_core_borrowed,
                           cluster
-                      FROM resource_states
+                      FROM latest_version_resource_states
                   ),
                   consolidated_periods AS (
                       SELECT 
@@ -538,7 +561,6 @@ Resources:
                           SUM(total_cpu_hours) as total_vcpu_utilization_hours,
                           SUM(allocated_cpu_hours) as allocated_vcpu_utilization_hours,
                           SUM(borrowed_cpu_hours) as borrowed_vcpu_utilization_hours,
-                          -- Partition columns
                           CAST(YEAR(report_date) AS VARCHAR) as year,
                           LPAD(CAST(MONTH(report_date) AS VARCHAR), 2, '0') as month,
                           LPAD(CAST(DAY(report_date) AS VARCHAR), 2, '0') as day,
@@ -574,7 +596,20 @@ Resources:
 
                 CRESCENDO_DETAILED = """
                     Insert into ${AthenaDBName}.detailed_report
-                    WITH workload_state_changes AS (
+                    WITH latest_version_workload AS (
+                      SELECT *
+                      FROM (
+                        SELECT
+                          *,
+                          ROW_NUMBER() OVER (
+                            PARTITION BY workload_name, timestamp, namespace, team, instance_type
+                            ORDER BY CAST(resource_version AS bigint) DESC
+                          ) AS row_num
+                        FROM ${AthenaDBName}.workload
+                      ) ranked
+                      WHERE row_num = 1
+                    ),
+                    workload_state_changes AS (
                         SELECT DISTINCT
                             workload_name,
                             timestamp,
@@ -588,11 +623,12 @@ Resources:
                             neuron_core,
                             admitted,
                             finished,
+                            labels,
                             year,
                             month,
                             day,
                             cluster
-                        FROM ${AthenaDBName}.workload
+                        FROM latest_version_workload
                         WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     ),
 
@@ -618,6 +654,7 @@ Resources:
                             neuron_core,
                             admitted,
                             finished,
+                            labels,
                             year,
                             month,
                             day,
@@ -664,6 +701,7 @@ Resources:
                             team,
                             instance_type,
                             task_priority_class,
+                            labels,
                             CPU,
                             GPU,
                             neuron_core,
@@ -679,6 +717,7 @@ Resources:
                             team,
                             instance_type,
                             task_priority_class,
+                            labels,
                             CPU,
                             GPU,
                             neuron_core,
@@ -695,6 +734,7 @@ Resources:
                             team,
                             instance_type,
                             task_priority_class,
+                            labels,
                             MIN(period_start) AS period_start,
                             MAX(period_end) AS period_end,
                             MAX(status) AS status,
@@ -717,6 +757,7 @@ Resources:
                             team,
                             instance_type,
                             task_priority_class,
+                            labels,
                             year,
                             month,
                             day,
@@ -724,6 +765,8 @@ Resources:
                     )
                     SELECT
                         DATE(period_start) as report_date,
+                        period_start,
+                        period_end,
                         namespace,
                         team,
                         workload_name as task_name,
@@ -737,6 +780,7 @@ Resources:
                         cpu_utilization_hours as utilized_vcpu_hours,
                         CAST(cpu_count as double) as utilized_vcpu_count,
                         task_priority_class as priority_class,
+                        labels,
                         year,
                         month,
                         day,
@@ -747,7 +791,20 @@ Resources:
 
                 NON_CRESCENDO_SUMMARY = """
                 INSERT INTO ${AthenaDBName}.summary_report
-                WITH pod_state_changes AS (
+                WITH latest_pod_state_changes AS (
+                  SELECT *
+                  FROM (
+                    SELECT
+                      *,
+                      ROW_NUMBER() OVER (
+                        PARTITION BY pod, timestamp, namespace, owner, instance_type
+                        ORDER BY CAST(resource_version AS bigint) DESC
+                      ) AS row_num
+                    FROM ${AthenaDBName}.pod
+                  ) ranked
+                  WHERE row_num = 1
+                ),
+                pod_state_changes AS (
                     SELECT DISTINCT
                         pod,
                         timestamp,
@@ -763,7 +820,7 @@ Resources:
                         month,
                         day,
                         cluster
-                    FROM ${AthenaDBName}.pod
+                    FROM latest_pod_state_changes
                     WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     AND status != 'Unknown'
                 ),
@@ -872,7 +929,20 @@ Resources:
 
                 NON_CRESCENDO_DETAILED = """
                     INSERT INTO ${AthenaDBName}.detailed_report
-                    WITH pod_state_changes AS (
+                    WITH latest_pod_state_changes AS (
+                      SELECT *
+                      FROM (
+                        SELECT
+                          *,
+                          ROW_NUMBER() OVER (
+                            PARTITION BY pod, timestamp, namespace, owner, instance_type
+                            ORDER BY CAST(resource_version AS bigint) DESC
+                          ) AS row_num
+                        FROM ${AthenaDBName}.pod
+                      ) ranked
+                      WHERE row_num = 1
+                    ),
+                    pod_state_changes AS (
                         SELECT DISTINCT
                             namespace,
                             pod,
@@ -886,11 +956,12 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
+                            labels,
                             year,
                             month,
                             day,
                             cluster
-                        FROM ${AthenaDBName}.pod
+                        FROM latest_pod_state_changes
                         WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     ),
                     running_periods AS (
@@ -914,6 +985,7 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
+                            labels,
                             year,
                             month,
                             day,
@@ -963,6 +1035,7 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
+                            labels,
                             year,
                             month,
                             day,
@@ -979,6 +1052,7 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
+                            labels,
                             year,
                             month,
                             day,
@@ -1002,6 +1076,7 @@ Resources:
                             COUNT_IF(GPU > 0) AS gpu_count,
                             COUNT_IF(neuron_core > 0) AS neuron_count,
                             priority_class,
+                            labels,
                             year,
                             month,
                             day,
@@ -1014,6 +1089,7 @@ Resources:
                             instance_type,
                             job_type,
                             priority_class,
+                            labels,
                             year,
                             month,
                             day,
@@ -1021,6 +1097,8 @@ Resources:
                     )
                     SELECT
                         DATE(period_start) as report_date,
+                        period_start,
+                        period_end,
                         namespace,
                         '' as team,
                         task_name,
@@ -1034,6 +1112,7 @@ Resources:
                         cpu_utilization_hours as utilized_vcpu_hours,
                         CAST(cpu_count as double) as utilized_vcpu_count,
                         priority_class,
+                        labels,
                         year,
                         month,
                         day,
