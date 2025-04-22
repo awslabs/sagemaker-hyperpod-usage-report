@@ -4,7 +4,8 @@ from unittest.mock import mock_open, patch
 import pandas as pd
 import pytest
 
-from hyperpod_usage_report.generators.csv_generator import CSVReportGenerator
+from src.hyperpod_usage_report.generators.csv_generator import \
+    CSVReportGenerator
 
 
 @pytest.fixture
@@ -204,5 +205,6 @@ def test_detailed_report_content(detailed_df, header_info, empty_missing_periods
     write_calls = [call.args[0] for call in mock_file().write.call_args_list]
     assert any("ClusterName: test-cluster\n" in call for call in write_calls)
     assert any(
-        "2025-03-25,20:00:00,21:00:00,test-namespace,test-team,test-task" in call for call in write_calls
+        "2025-03-25,20:00:00,21:00:00,test-namespace,test-team,test-task" in call
+        for call in write_calls
     )

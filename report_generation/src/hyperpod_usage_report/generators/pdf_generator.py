@@ -90,7 +90,7 @@ class PDFReportGenerator(BaseReportGenerator):
                     "allocated_vcpu_utilization_hours",
                     "borrowed_vcpu_utilization_hours",
                 ]
-            ]
+            ],
         ]
 
         self.summary_table_headers = [
@@ -106,7 +106,7 @@ class PDFReportGenerator(BaseReportGenerator):
             "Borrowed\nutilization\n(hours)",
             "Total\nutilization\n(hours)",
             "Allocated\nutilization\n(hours)",
-            "Borrowed\nutilization\n(hours)"
+            "Borrowed\nutilization\n(hours)",
         ]
 
     def _create_pdf(self) -> FPDF:

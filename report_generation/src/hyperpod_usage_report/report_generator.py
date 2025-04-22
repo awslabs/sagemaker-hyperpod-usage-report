@@ -6,10 +6,10 @@ from typing import Any, Dict
 import awswrangler as wr
 import pandas as pd
 
-from hyperpod_usage_report.generators.csv_generator import CSVReportGenerator
-from hyperpod_usage_report.generators.pdf_generator import PDFReportGenerator
-from hyperpod_usage_report.utils.query_builder import QueryBuilder
-from hyperpod_usage_report.utils.s3_uploader import S3Uploader
+from .generators.csv_generator import CSVReportGenerator
+from .generators.pdf_generator import PDFReportGenerator
+from .utils.query_builder import QueryBuilder
+from .utils.s3_uploader import S3Uploader
 
 
 class ReportType(Enum):

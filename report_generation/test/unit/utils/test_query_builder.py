@@ -1,6 +1,6 @@
 import pytest
 
-from hyperpod_usage_report.utils.query_builder import QueryBuilder
+from src.hyperpod_usage_report.utils.query_builder import QueryBuilder
 
 
 def test_build_query_summary():

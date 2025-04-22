@@ -9,12 +9,6 @@ This repository enables the HyperPod cluster usage report feature for AWS HyperP
 - pip
 - AWS CLI
 
-Install the package:
-
-```bash
-pip install -e .
-```
-
 ## Setup
 
 ### Step 1: Deploy CloudFormation
@@ -110,6 +104,13 @@ aws eks create-pod-identity-association \
 
 ### Step 4: Report Generation
 Generate usage reports using the following command:
+
+Install the package:
+
+```bash
+cd report_generation
+pip install -e .
+```
 
 ```bash
 python3 run.py --start-date YYYY-MM-DD \

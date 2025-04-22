@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from hyperpod_usage_report.report_generator import ReportGenerator
+from src.hyperpod_usage_report.report_generator import ReportGenerator
 
 
 @pytest.fixture
@@ -27,7 +27,7 @@ def test_report_generator_init(report_generator):
     assert isinstance(report_generator.end_date, datetime)
 
 
-@patch("hyperpod_usage_report.report_generator.wr")
+@patch("src.hyperpod_usage_report.report_generator.wr")
 def test_fetch_data(mock_wr, report_generator):
     # Arrange
     mock_df = Mock()
@@ -41,7 +41,7 @@ def test_fetch_data(mock_wr, report_generator):
     mock_wr.athena.read_sql_query.assert_called_once()
 
 
-@patch("hyperpod_usage_report.report_generator.wr")
+@patch("src.hyperpod_usage_report.report_generator.wr")
 def test_fetch_data_error(mock_wr, report_generator):
     # Arrange
     mock_wr.athena.read_sql_query.side_effect = Exception("Database error")

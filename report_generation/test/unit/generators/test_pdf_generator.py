@@ -5,9 +5,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from hyperpod_usage_report.generators.pdf_generator import (ColumnConfig,
-                                                            PDFReportGenerator,
-                                                            PDFStyle)
+from src.hyperpod_usage_report.generators.pdf_generator import (
+    ColumnConfig, PDFReportGenerator, PDFStyle)
 
 
 @pytest.fixture
@@ -134,7 +133,7 @@ def test_add_report_header_with_missing_periods(mock_pdf, header_info, missing_p
     assert any("start_time" in str(call) for call in calls)
 
 
-@patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
 def test_generate_summary_report(
     mock_fpdf, summary_df, header_info, empty_missing_periods
 ):
@@ -147,7 +146,7 @@ def test_generate_summary_report(
     mock_fpdf.return_value.output.assert_called_once_with(output_file)
 
 
-@patch("hyperpod_usage_report.generators.pdf_generator.FPDF")
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
 def test_generate_detailed_report(
     mock_fpdf, detailed_df, header_info, empty_missing_periods
 ):
