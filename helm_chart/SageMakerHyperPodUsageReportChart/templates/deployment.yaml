@@ -20,7 +20,6 @@
 {{- $_ := set .Values.image "repository" (index .Values.image.repositoryDomainMap $region) -}}
 
 
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -48,6 +47,7 @@ spec:
           args:
             {{- if gt (int .Values.replicaCount) 1 }}
             - "--leader-elect=true"
+            {{- end }}
           env:
             - name: NAMESPACE
               valueFrom:
@@ -63,4 +63,3 @@ spec:
               value: {{ .Values.clusterName }}
             - name: BUCKET_NAME
               value: {{ .Values.s3BucketName }}
-
