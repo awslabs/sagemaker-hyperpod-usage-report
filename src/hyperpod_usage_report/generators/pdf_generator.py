@@ -31,13 +31,15 @@ class PDFReportGenerator(BaseReportGenerator):
         """Initialize column configurations and table headers for both report types"""
         self.detailed_columns = [
             ColumnConfig("report_date", 20, lambda x: x.strftime("%Y-%m-%d")),
-            ColumnConfig("namespace", 50),
-            ColumnConfig("team", 30),
+            ColumnConfig("period_start", 20, lambda x: x.strftime("%H:%M:%S")),
+            ColumnConfig("period_end", 20, lambda x: x.strftime("%H:%M:%S")),
+            ColumnConfig("namespace", 40),
+            ColumnConfig("team", 20),
             ColumnConfig("task_name", 70),
             ColumnConfig("instance", 20),
             ColumnConfig("status", 20),
             *[
-                ColumnConfig(f, 22, lambda x: f"{x:.2f}")
+                ColumnConfig(f, 21, lambda x: f"{x:.2f}")
                 for f in [
                     "utilized_neuron_core_hours",
                     "utilized_neuron_core_count",
@@ -47,11 +49,14 @@ class PDFReportGenerator(BaseReportGenerator):
                     "utilized_vcpu_count",
                 ]
             ],
-            ColumnConfig("priority_class", 30),
+            ColumnConfig("priority_class", 25),
+            ColumnConfig("labels", 20, lambda x: ",".join(x) if x else ""),
         ]
 
         self.detailed_table_headers = [
             "Date",
+            "Period Start",
+            "Period End",
             "Namespace",
             "Team",
             "Task",
@@ -63,7 +68,8 @@ class PDFReportGenerator(BaseReportGenerator):
             "Total\nutilization\n(count)",
             "Total\nutilization\n(hours)",
             "Total\nutilization\n(count)",
-            "Priority class",
+            "Priority Class",
+            "Labels",
         ]
 
         self.summary_columns = [
@@ -84,7 +90,7 @@ class PDFReportGenerator(BaseReportGenerator):
                     "allocated_vcpu_utilization_hours",
                     "borrowed_vcpu_utilization_hours",
                 ]
-            ],
+            ]
         ]
 
         self.summary_table_headers = [
@@ -100,7 +106,7 @@ class PDFReportGenerator(BaseReportGenerator):
             "Borrowed\nutilization\n(hours)",
             "Total\nutilization\n(hours)",
             "Allocated\nutilization\n(hours)",
-            "Borrowed\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)"
         ]
 
     def _create_pdf(self) -> FPDF:
@@ -116,7 +122,12 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # Print the cell content
         pdf.multi_cell(
-            width, height / 3 if "\n" in text else height, text, 0, "C", True
+            width,
+            height / 3 if "\n" in text else height / 2 if "Period" in text else height,
+            text,
+            0,
+            "C",
+            True,
         )
 
         # Return to the right of the cell
@@ -174,13 +185,13 @@ class PDFReportGenerator(BaseReportGenerator):
 
         # First row: Resource type headers with group labels
         if is_detailed:
-            base_width = sum(col.width for col in columns[:6])
-            metric_width = columns[6].width * 2
+            base_width = sum(col.width for col in columns[:8])
+            metric_width = columns[8].width * 2
             pdf.cell(base_width, 10, "", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "NeuronCore", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "GPU", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "vCPU", 1, 0, "C", True)
-            pdf.cell(columns[-1].width, 10, "", 1, 1, "C", True)
+            pdf.cell(columns[-2].width + columns[-1].width, 10, "", 1, 1, "C", True)
         else:
             base_width = sum(col.width for col in columns[:3])
             type_width = columns[3].width

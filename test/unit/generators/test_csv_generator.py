@@ -33,6 +33,8 @@ def detailed_df():
     return pd.DataFrame(
         {
             "report_date": [datetime.strptime("2025-03-25", "%Y-%m-%d")],
+            "period_start": [datetime.strptime("20:00:00", "%H:%M:%S")],
+            "period_end": [datetime.strptime("21:00:00", "%H:%M:%S")],
             "namespace": ["test-namespace"],
             "team": ["test-team"],
             "task_name": ["test-task"],
@@ -45,6 +47,7 @@ def detailed_df():
             "utilized_vcpu_hours": [3.0],
             "utilized_vcpu_count": [4],
             "priority_class": ["high"],
+            "labels": [""],
         }
     )
 
@@ -201,5 +204,5 @@ def test_detailed_report_content(detailed_df, header_info, empty_missing_periods
     write_calls = [call.args[0] for call in mock_file().write.call_args_list]
     assert any("ClusterName: test-cluster\n" in call for call in write_calls)
     assert any(
-        "2025-03-25,test-namespace,test-team,test-task" in call for call in write_calls
+        "2025-03-25,20:00:00,21:00:00,test-namespace,test-team,test-task" in call for call in write_calls
     )

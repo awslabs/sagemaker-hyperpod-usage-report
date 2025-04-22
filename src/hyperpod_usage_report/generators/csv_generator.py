@@ -102,15 +102,17 @@ class CSVReportGenerator(BaseReportGenerator):
         # Column headers (multi-level)
         resource_headers = [
             ",,,,,,NeuronCore,,GPU,,vCPU,,",
-            "Date,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
+            "Date,Period Start,Period End,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
             + "Total utilization (count),Total utilization (hours),Total utilization (count),"
-            + "Total utilization (hours),Total utilization (count),Priority class",
+            + "Total utilization (hours),Total utilization (count),Priority class,Labels",
         ]
 
         # Reorder DataFrame columns to match desired output
         df = df[
             [
                 "report_date",
+                "period_start",
+                "period_end",
                 "namespace",
                 "team",
                 "task_name",
@@ -123,6 +125,7 @@ class CSVReportGenerator(BaseReportGenerator):
                 "utilized_vcpu_hours",
                 "utilized_vcpu_count",
                 "priority_class",
+                "labels",
             ]
         ]
 
@@ -143,6 +146,8 @@ class CSVReportGenerator(BaseReportGenerator):
             for _, row in df.iterrows():
                 formatted_row = [
                     row["report_date"].strftime("%Y-%m-%d"),
+                    row["period_start"].strftime("%H:%M:%S"),
+                    row["period_end"].strftime("%H:%M:%S"),
                     row["namespace"],
                     row["team"],
                     row["task_name"],
@@ -155,6 +160,7 @@ class CSVReportGenerator(BaseReportGenerator):
                     f"{row['utilized_vcpu_hours']:.2f}",
                     f"{row['utilized_vcpu_count']:.2f}",
                     row["priority_class"],
+                    f"{','.join(row['labels']) if row['labels'] else ''}",
                 ]
                 f.write(",".join(formatted_row) + "\n")
 

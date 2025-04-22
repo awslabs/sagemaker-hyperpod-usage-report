@@ -17,7 +17,7 @@ class QueryBuilder:
             FROM detailed_report
             WHERE DATE(report_date) BETWEEN DATE('{start_date}')
                 AND DATE('{end_date}')
-            ORDER BY report_date, namespace, team, task_name
+            ORDER BY report_date, period_start, namespace, team, task_name
             """
         else:
             raise ValueError(
