@@ -1,0 +1,218 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:CreateStack",
+                "cloudformation:DeleteStack",
+                "cloudformation:DescribeStacks"
+            ],
+            "Resource": "arn:aws:cloudformation:*:*:stack/sagemaker-hyperpod-usage-report/*"
+        },    
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:CreateBucket",
+                "s3:PutBucketPolicy",
+                "s3:PutBucketVersioning",
+                "s3:PutBucketPublicAccessBlock",
+                "s3:PutEncryptionConfiguration",
+                "s3:PutLifecycleConfiguration",
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:GetBucketLocation",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::*-usage-report",
+                "arn:aws:s3:::*-usage-report/*",
+                "arn:aws:s3:::aws-athena-query-results-*",
+                "arn:aws:s3:::aws-athena-query-results-*/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "eks:CreatePodIdentityAssociation",
+                "eks:DeletePodIdentityAssociation",
+                "eks:DescribePodIdentityAssociation"
+            ],
+            "Resource": [
+                "arn:aws:eks:*:*:cluster/*",
+                "arn:aws:eks:*:*:podidentityassociation/*/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "glue:CreateDatabase",
+                "glue:DeleteDatabase",
+                "glue:GetDatabase",
+                "glue:UpdateDatabase",
+                "glue:GetPartitions",
+                "glue:GetTable",
+                "glue:GetTables",
+                "glue:GetDatabases",
+                "glue:CreateTable",
+                "glue:GetPartition",
+                "glue:DeleteTable",
+                "glue:UpdateTable"    
+            ],
+            "Resource": [
+                "arn:aws:glue:*:*:catalog",
+                "arn:aws:glue:*:*:database/usage_report",
+                "arn:aws:glue:*:*:table/usage_report/*",
+                "arn:aws:glue:*:*:userDefinedFunction/usage_report/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Resource": [
+                "arn:aws:s3:::*/raw/clusterqueue/*",
+                "arn:aws:s3:::*/raw/workload/*",
+                "arn:aws:s3:::*/raw/pod/*",
+                "arn:aws:s3:::*/reports/detailed/*",
+                "arn:aws:s3:::*/reports/summary/*",
+                "arn:aws:s3:::*/raw/heartdub/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "events:PutRule",
+                "events:DeleteRule",
+                "events:PutTargets",
+                "events:RemoveTargets",
+                "events:DescribeRule"
+            ],
+            "Resource": [
+                "arn:aws:events:*:*:rule/sagemaker-hyperpod-usage-report-aggregation-rule"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:PutRolePolicy",
+                "iam:DeleteRolePolicy",
+                "iam:AttachRolePolicy",
+                "iam:DetachRolePolicy"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-LambdaExecutionRole"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreatePolicy",
+                "iam:DeletePolicy",
+                "iam:GetPolicy",
+                "iam:GetPolicyVersion",
+                "iam:CreatePolicyVersion",
+                "iam:DeletePolicyVersion",
+                "iam:ListPolicyVersions"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:policy/ClusterUsageReportDataAggregationPolicy"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:CreateRole",
+                "iam:DeleteRole",
+                "iam:GetRole",
+                "iam:PutRolePolicy",
+                "iam:DeleteRolePolicy"
+            ],
+            "Resource": "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-ServiceAccountRole"
+        },        
+        {
+            "Effect": "Allow",
+            "Action": [
+                "iam:PassRole"
+            ],
+            "Resource": [
+                "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-LambdaExecutionRole",
+                "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-ServiceAccountRole"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "lambda:CreateFunction",
+                "lambda:DeleteFunction",
+                "lambda:GetFunction",
+                "lambda:UpdateFunctionCode",
+                "lambda:UpdateFunctionConfiguration",
+                "lambda:DeleteFunction"
+            ],
+            "Resource": [
+                "arn:aws:lambda:*:*:function:sagemaker-hyperpod-usage-report-AggregationLambda"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "sagemaker:DescribeCluster"
+            ],
+            "Resource": "arn:aws:sagemaker:*:*:cluster/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "eks:DescribeCluster",
+                "eks:ListClusters"
+            ],
+            "Resource": "arn:aws:eks:*:*:cluster/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "eks:CreateAccessEntry",
+                "eks:DescribeAccessEntry",
+                "eks:CreateAccessEntry",
+                "eks:ListAssociatedAccessPolicies"
+            ],
+            "Resource": [
+                "arn:aws:eks:*:*:cluster/*",
+                "arn:aws:eks:*:*:access-entry/*"
+            ]
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "eks:CreateAddon",
+                "eks:DeleteAddon", 
+                "eks:DescribeAddon"
+            ],
+            "Resource": "arn:aws:eks:*:*:cluster/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": "sts:AssumeRole",
+            "Resource": "*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "athena:GetWorkGroup",
+                "athena:StartQueryExecution",
+                "athena:GetQueryExecution",
+                "athena:GetQueryResults",
+                "athena:StopQueryExecution"
+            ],
+            "Resource": [
+                "arn:aws:athena:*:*:workgroup/*"
+            ]
+        }              
+    ]
+}
