@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sagemaker-hyperpod-usage-report
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    meta.helm.sh/release-name: sagemaker-hyperpod-usage-report
+    meta.helm.sh/release-namespace: default
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: usage-report-role
+  namespace: sagemaker-hyperpod-usage-report
+rules:
+- apiGroups: [""]
+  resources: ["serviceaccounts"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["create", "get", "update", "delete"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1 
+kind: RoleBinding 
+metadata: 
+  name: usage-report-binding 
+  namespace: sagemaker-hyperpod-usage-report 
+subjects: 
+- kind: User 
+  name: UsageReportRole 
+  apiGroup: rbac.authorization.k8s.io 
+roleRef: 
+  kind: Role 
+  name: usage-report-role 
+  apiGroup: rbac.authorization.k8s.io 
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: usage-report-role
+rules:
+- apiGroups: ["rbac.authorization.k8s.io"]
+  resources: ["clusterroles", "clusterrolebindings"]
+  verbs: ["create", "get", "delete"]
+- apiGroups: [""]
+  resources: ["secrets"] # required to install the helm chart
+  verbs: ["create", "get", "list", "watch", "update", "delete"]
+- apiGroups: [""]  # "" indicates the core API group
+  resources: ["namespaces"] # required to create/path namespace
+  verbs: ["get", "list", "watch", "patch", "delete"]
+- apiGroups: [""]  
+  resources: ["pods"] # helm chart rbac.yaml
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]  
+  resources: ["nodes"] # helm chart rbac.yaml
+  verbs: ["get"]
+- apiGroups: ["kueue.x-k8s.io"]
+  resources: ["clusterqueues", "workloads"] # helm chart rbac.yaml
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"] # helm chart rbac.yaml
+  verbs: [ "get" ]
+- apiGroups: ["coordination.k8s.io"]
+  resources: ["leases"] # helm chart rbac.yaml
+  verbs: ["create", "get", "list", "update", "watch", "delete"]
+- apiGroups: [""]
+  resources: ["events"] # helm chart rbac.yaml
+  verbs: ["create", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: usage-report-binding
+subjects:
+- kind: Group
+  name: UsageReportRole
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: usage-report-role
+  apiGroup: rbac.authorization.k8s.io
