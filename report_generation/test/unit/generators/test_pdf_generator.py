@@ -6,7 +6,10 @@ import pandas as pd
 import pytest
 
 from src.hyperpod_usage_report.generators.pdf_generator import (
-    ColumnConfig, PDFReportGenerator, PDFStyle)
+    ColumnConfig,
+    PDFReportGenerator,
+    PDFStyle,
+)
 
 
 @pytest.fixture
@@ -91,7 +94,7 @@ def test_column_config_initialization():
     assert generator.summary_columns[0].name == "report_date"
 
     # Test detailed columns
-    assert len(generator.detailed_columns) == 16
+    assert len(generator.detailed_columns) == 15
     assert isinstance(generator.detailed_columns[0], ColumnConfig)
     assert generator.detailed_columns[0].name == "report_date"
 

@@ -104,7 +104,7 @@ class CSVReportGenerator(BaseReportGenerator):
             ",,,,,,NeuronCore,,GPU,,vCPU,,",
             "Date,Period Start,Period End,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
             + "Total utilization (count),Total utilization (hours),Total utilization (count),"
-            + "Total utilization (hours),Total utilization (count),Priority class,Labels",
+            + "Total utilization (hours),Total utilization (count),Priority class",
         ]
 
         # Reorder DataFrame columns to match desired output
@@ -125,7 +125,6 @@ class CSVReportGenerator(BaseReportGenerator):
                 "utilized_vcpu_hours",
                 "utilized_vcpu_count",
                 "priority_class",
-                "labels",
             ]
         ]
 
@@ -160,7 +159,6 @@ class CSVReportGenerator(BaseReportGenerator):
                     f"{row['utilized_vcpu_hours']:.2f}",
                     f"{row['utilized_vcpu_count']:.2f}",
                     row["priority_class"],
-                    f"{','.join(row['labels']) if row['labels'] else ''}",
                 ]
                 f.write(",".join(formatted_row) + "\n")
 

@@ -4,8 +4,7 @@ from unittest.mock import mock_open, patch
 import pandas as pd
 import pytest
 
-from src.hyperpod_usage_report.generators.csv_generator import \
-    CSVReportGenerator
+from src.hyperpod_usage_report.generators.csv_generator import CSVReportGenerator
 
 
 @pytest.fixture

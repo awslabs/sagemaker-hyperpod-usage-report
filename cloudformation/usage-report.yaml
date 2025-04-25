@@ -227,8 +227,6 @@ Resources:
               Type: boolean
             - Name: finished
               Type: boolean
-            - Name: labels
-              Type: array<string>
         PartitionKeys:
             - Name: year
               Type: string
@@ -288,8 +286,6 @@ Resources:
               Type: double
             - Name: priority_class
               Type: string
-            - Name: labels
-              Type: array<string>
         PartitionKeys:
             - Name: year
               Type: string
@@ -355,8 +351,6 @@ Resources:
               Type: double
             - Name: priority_class
               Type: string
-            - Name: labels
-              Type: array<string>
         PartitionKeys:
             - Name: year
               Type: string
@@ -621,7 +615,7 @@ Resources:
                     workload_state_changes AS (
                         SELECT DISTINCT
                             workload_name, timestamp, namespace, team, status, instance_type, task_priority_class,
-                            CPU, GPU, neuron_core, admitted, finished, labels, year, month, day, cluster
+                            CPU, GPU, neuron_core, admitted, finished, year, month, day, cluster
                         FROM latest_version_workload
                         WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     ),
@@ -629,22 +623,22 @@ Resources:
                     running_periods AS (
                         SELECT 
                             workload_name, timestamp as period_start,
-                            LEAD(timestamp) OVER(
+                            COALESCE(LEAD(timestamp) OVER(
                                 PARTITION BY workload_name, instance_type, year, month, day
                                 ORDER BY timestamp
-                            ) as period_end,
+                            ), timestamp) as period_end,
                             namespace, status,
                             LEAD(status) OVER(
                                 PARTITION BY workload_name, instance_type, year, month, day
                                 ORDER BY timestamp
                             ) as next_status,
                             team, instance_type, task_priority_class, CPU, GPU, neuron_core,
-                            admitted, finished, labels, year, month, day, cluster
+                            admitted, finished, year, month, day, cluster
                         FROM workload_state_changes
                     ),
 
                     filtered_running_periods AS (
-                        SELECT *, LAG(period_end) OVER (PARTITION BY workload_name ORDER BY period_start) AS prev_period_end
+                        SELECT *, LAG(period_end) OVER (PARTITION BY workload_name, instance_type ORDER BY period_start) AS prev_period_end
                         FROM running_periods
                         WHERE admitted = true
                     ),
@@ -660,7 +654,7 @@ Resources:
                     ),
 
                     grouped_with_ids AS (
-                        SELECT *, SUM(is_new_group) OVER (PARTITION BY workload_name ORDER BY period_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS group_id
+                        SELECT *, SUM(is_new_group) OVER (PARTITION BY workload_name, instance_type ORDER BY period_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS group_id
                         FROM running_grouped
                     ),
 
@@ -671,15 +665,15 @@ Resources:
                                 WHEN bool_or(finished) THEN 'Succeeded'
                                 WHEN bool_or(next_status = 'Failed') OR bool_or(next_status IS NULL) THEN 'Failed'
                                 ELSE 'Running'
-                            END AS status, team, instance_type, task_priority_class, labels, CPU, GPU, neuron_core, year, month, day, cluster
+                            END AS status, team, instance_type, task_priority_class, CPU, GPU, neuron_core, year, month, day, cluster
                         FROM grouped_with_ids
                         GROUP BY 
-                          workload_name, group_id, namespace, team, instance_type, task_priority_class, labels, CPU, GPU, neuron_core, 
+                          workload_name, group_id, namespace, team, instance_type, task_priority_class, CPU, GPU, neuron_core, 
                           year, month, day, cluster
                     ),
                     team_grouped_utilization AS (
                         SELECT
-                            workload_name, group_id, namespace, team, instance_type, task_priority_class, labels,
+                            workload_name, group_id, namespace, team, instance_type, task_priority_class,
                             MIN(period_start) AS period_start, MAX(period_end) AS period_end, MAX(status) AS status,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * CPU) AS cpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * GPU) AS gpu_utilization_hours,
@@ -689,14 +683,14 @@ Resources:
                             year, month, day, cluster
                         FROM continuous_running_periods
                         GROUP BY 
-                            workload_name, group_id, namespace, team, instance_type, task_priority_class, labels,
+                            workload_name, group_id, namespace, team, instance_type, task_priority_class,
                             year, month, day, cluster
                     )
                     SELECT DATE(period_start) as report_date, period_start, period_end, namespace, team, workload_name as task_name,
                         instance_type as instance, workload_count as instance_count, status, neuron_utilization_hours as utilized_neuron_core_hours, 
                         CAST(neuron_count as double) as utilized_neuron_core_count, gpu_utilization_hours as utilized_gpu_hours, 
                         CAST(gpu_count as double) as utilized_gpu_count, cpu_utilization_hours as utilized_vcpu_hours, 
-                        CAST(cpu_count as double) as utilized_vcpu_count, task_priority_class as priority_class, labels, 
+                        CAST(cpu_count as double) as utilized_vcpu_count, task_priority_class as priority_class, 
                         year, month, day, cluster
                     FROM team_grouped_utilization
                     ORDER BY report_date, task_name, instance;
@@ -869,7 +863,6 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
-                            labels,
                             year,
                             month,
                             day,
@@ -882,10 +875,10 @@ Resources:
                             namespace,
                             pod,
                             timestamp as period_start,
-                            LEAD(timestamp) OVER(
+                            COALESCE(LEAD(timestamp) OVER(
                                 PARTITION BY pod, instance_type, year, month, day
                                 ORDER BY timestamp
-                            ) as period_end,
+                            ), timestamp) as period_end,
                             status,
                             LEAD(status) OVER(
                                 PARTITION BY pod, instance_type, year, month, day
@@ -898,7 +891,6 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
-                            labels,
                             year,
                             month,
                             day,
@@ -948,7 +940,6 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
-                            labels,
                             year,
                             month,
                             day,
@@ -965,7 +956,6 @@ Resources:
                             GPU,
                             neuron_core,
                             priority_class,
-                            labels,
                             year,
                             month,
                             day,
@@ -989,7 +979,6 @@ Resources:
                             COUNT_IF(GPU > 0) AS gpu_count,
                             COUNT_IF(neuron_core > 0) AS neuron_count,
                             priority_class,
-                            labels,
                             year,
                             month,
                             day,
@@ -997,7 +986,7 @@ Resources:
                         FROM continuous_running_periods
                         GROUP BY 
                             namespace, task_name, group_id, instance_type, job_type,
-                            priority_class, labels, year, month, day, cluster
+                            priority_class, year, month, day, cluster
                     )
                     SELECT
                         DATE(period_start) as report_date, period_start, period_end, namespace, '' as team,
@@ -1008,16 +997,16 @@ Resources:
                         CAST(gpu_count as double) as utilized_gpu_count,
                         cpu_utilization_hours as utilized_vcpu_hours,
                         CAST(cpu_count as double) as utilized_vcpu_count,
-                        priority_class, labels, year, month, day, cluster
+                        priority_class, year, month, day, cluster
                     FROM team_grouped_utilization
                     ORDER BY report_date, task_name, instance;
                 """
 
             class AthenaQueryExecutor:
-                def __init__(self):
+                def __init__(self, dry_run):
                     self.athena = boto3.client('athena')
                     self.output_location = "s3://${UsageReportBucket}/athena-results"
-                    self.yesterday = (datetime.now() - timedelta(days=1))
+                    self.yesterday = (datetime.now() - timedelta(days=1)) if not dry_run else datetime.now()
                     self.query_mapping = {
                         QueryType.CRESCENDO_SUMMARY: QueryTemplates.CRESCENDO_SUMMARY,
                         QueryType.CRESCENDO_DETAILED: QueryTemplates.CRESCENDO_DETAILED,
@@ -1093,7 +1082,8 @@ Resources:
                 """
                 Main handler that executes all aggregations in parallel
                 """
-                executor = AthenaQueryExecutor()
+                dry_run = event.get('dry_run', False)
+                executor = AthenaQueryExecutor(dry_run)
                 results = []
                 for query_type in QueryType:
                     result = executor.execute_aggregation(query_type)
