@@ -18,7 +18,7 @@ export AWS_REGION=<aws region>
 export HYPERPOD_CLUSTER_NAME=<hyperpod cluster name>
 export EKS_CLUSTER_NAME=<eks cluster name>
 export USAGE_REPORT_CFN_STACK_NAME=sagemaker-hyperpod-usage-report
-export HYPERPOD_CLUSTER_ID=$(aws sagemaker describe-cluster --cluster-name ml-cluster --region $AWS_REGION | jq -r '.ClusterArn | split("/")[-1]')
+export HYPERPOD_CLUSTER_ID=$(aws sagemaker describe-cluster --cluster-name $HYPERPOD_CLUSTER_NAME --region $AWS_REGION | jq -r '.ClusterArn | split("/")[-1]')
 ```
 
 ### Step 1: Deploy CloudFormation
@@ -52,6 +52,11 @@ ParameterKey=EKSClusterName,ParameterValue=$EKS_CLUSTER_NAME ParameterKey=HyperP
 ```
 
 ### Step 2: Install Helm Chart
+To configure the connection to your cluster, run
+```
+aws eks update-kubeconfig --name $EKS_CLUSTER_NAME --region $AWS_REGION
+```
+Then install the Helm chart
 ```
 cd helm_chart
 helm install sagemaker-hyperpod-usage-report ./SageMakerHyperPodUsageReportChart --set region=$AWS_REGION --set clusterName=$HYPERPOD_CLUSTER_NAME --set s3BucketName=$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_CLUSTER_ID-usage-report
