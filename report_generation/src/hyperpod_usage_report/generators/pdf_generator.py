@@ -50,7 +50,6 @@ class PDFReportGenerator(BaseReportGenerator):
                 ]
             ],
             ColumnConfig("priority_class", 25),
-            ColumnConfig("labels", 20, lambda x: ",".join(x) if x else ""),
         ]
 
         self.detailed_table_headers = [
@@ -69,7 +68,6 @@ class PDFReportGenerator(BaseReportGenerator):
             "Total\nutilization\n(hours)",
             "Total\nutilization\n(count)",
             "Priority Class",
-            "Labels",
         ]
 
         self.summary_columns = [
@@ -191,7 +189,7 @@ class PDFReportGenerator(BaseReportGenerator):
             pdf.cell(metric_width, 10, "NeuronCore", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "GPU", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "vCPU", 1, 0, "C", True)
-            pdf.cell(columns[-2].width + columns[-1].width, 10, "", 1, 1, "C", True)
+            pdf.cell(columns[-1].width, 10, "", 1, 1, "C", True)
         else:
             base_width = sum(col.width for col in columns[:3])
             type_width = columns[3].width
