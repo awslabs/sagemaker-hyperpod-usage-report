@@ -60,7 +60,7 @@ class ReportGenerator:
                 self.start_date.strftime("%Y-%m-%d"),
                 self.end_date.strftime("%Y-%m-%d"),
             )
-            return wr.athena.read_sql_query(sql=query, database=self.database_name)
+            return wr.athena.read_sql_query(sql=query, database=self.database_name, workgroup='usage-report-workgroup')
         except Exception as e:
             print(f"Error fetching data: {str(e)}")
             raise

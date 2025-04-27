@@ -125,6 +125,13 @@ Resources:
         Name: !Ref AthenaDBName
         Description: 'Database for AWS Cluster usage report.'
 
+  UsageReportAthenaWorkGroup:
+    Type: AWS::Athena::WorkGroup
+    Properties:
+      Name: "usage-report-workgroup"
+      WorkGroupConfiguration:
+        ResultConfiguration:
+          OutputLocation: !Sub "s3://${UsageReportBucket}/athena-results"
   # ClusterQueue Table
   ClusterQueueTable:
     Type: AWS::Glue::Table
