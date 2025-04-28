@@ -80,7 +80,6 @@ Resources:
   ServiceAccountRole:
     Type: 'AWS::IAM::Role'
     Properties:
-      RoleName: sagemaker-hyperpod-usage-report-ServiceAccountRole
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -460,7 +459,6 @@ Resources:
   AggregationRule:
     Type: AWS::Events::Rule
     Properties:
-      Name: sagemaker-hyperpod-usage-report-aggregation-rule
       ScheduleExpression: "cron(0 0 * * ? *)" 
       State: ENABLED
       Targets:
@@ -469,7 +467,6 @@ Resources:
   LambdaExecutionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: sagemaker-hyperpod-usage-report-LambdaExecutionRole
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
@@ -483,7 +480,6 @@ Resources:
   LambdaExecutionRolePolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
-      ManagedPolicyName: 'ClusterUsageReportDataAggregationPolicy'
       PolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -502,7 +498,6 @@ Resources:
   AggregationLambda:
     Type: AWS::Lambda::Function
     Properties:
-      FunctionName: sagemaker-hyperpod-usage-report-AggregationLambda
       Role: !GetAtt LambdaExecutionRole.Arn
       Handler: index.aggregate_all_data
       Runtime: python3.9
