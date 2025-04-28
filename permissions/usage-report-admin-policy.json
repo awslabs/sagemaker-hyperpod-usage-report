@@ -91,7 +91,7 @@
                 "events:DescribeRule"
             ],
             "Resource": [
-                "arn:aws:events:*:*:rule/sagemaker-hyperpod-usage-report-aggregation-rule"
+                "arn:aws:events:*:*:rule/*-AggregationRule-*"
             ]
         },
         {
@@ -106,7 +106,7 @@
                 "iam:DetachRolePolicy"
             ],
             "Resource": [
-                "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-LambdaExecutionRole"
+                "arn:aws:iam::*:role/*-LambdaExecutionRole-*"
             ]
         },
         {
@@ -121,7 +121,7 @@
                 "iam:ListPolicyVersions"
             ],
             "Resource": [
-                "arn:aws:iam::*:policy/ClusterUsageReportDataAggregationPolicy"
+                "arn:aws:iam::*:policy/*-LambdaExecutionRolePolicy-*"
             ]
         },
         {
@@ -133,7 +133,7 @@
                 "iam:PutRolePolicy",
                 "iam:DeleteRolePolicy"
             ],
-            "Resource": "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-ServiceAccountRole"
+            "Resource": "arn:aws:iam::*:role/*-ServiceAccountRole-*"
         },        
         {
             "Effect": "Allow",
@@ -141,8 +141,8 @@
                 "iam:PassRole"
             ],
             "Resource": [
-                "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-LambdaExecutionRole",
-                "arn:aws:iam::*:role/sagemaker-hyperpod-usage-report-ServiceAccountRole"
+                "arn:aws:iam::*:role/*-LambdaExecutionRole-*",
+                "arn:aws:iam::*:role/*-ServiceAccountRole-*"
             ]
         },
         {
@@ -156,7 +156,7 @@
                 "lambda:DeleteFunction"
             ],
             "Resource": [
-                "arn:aws:lambda:*:*:function:sagemaker-hyperpod-usage-report-AggregationLambda"
+                "arn:aws:lambda:*:*:function:*-AggregationLambda-*"
             ]
         },
         {
@@ -180,7 +180,8 @@
                 "eks:CreateAccessEntry",
                 "eks:DescribeAccessEntry",
                 "eks:CreateAccessEntry",
-                "eks:ListAssociatedAccessPolicies"
+                "eks:ListAssociatedAccessPolicies",
+                "eks:DeleteAccessEntry"
             ],
             "Resource": [
                 "arn:aws:eks:*:*:cluster/*",
@@ -195,11 +196,6 @@
                 "eks:DescribeAddon"
             ],
             "Resource": "arn:aws:eks:*:*:cluster/*"
-        },
-        {
-            "Effect": "Allow",
-            "Action": "sts:AssumeRole",
-            "Resource": "*"
         },
         {
             "Effect": "Allow",
