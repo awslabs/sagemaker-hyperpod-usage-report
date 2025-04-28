@@ -8,8 +8,9 @@ class S3Uploader:
     def upload_file(file_path: str, output_location: str) -> None:
         try:
             s3_client = boto3.client("s3")
-            bucket = output_location.split("/")[2]
-            key = "/".join(output_location.split("/")[3:]) + os.path.basename(file_path)
+            parts = output_location.rstrip('/').split("/")
+            bucket = parts[2]
+            key = f"{'/'.join(parts[3:])}/{os.path.basename(file_path)}"
 
             s3_client.upload_file(file_path, bucket, key)
             print(

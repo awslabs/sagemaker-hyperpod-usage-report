@@ -50,6 +50,8 @@ aws cloudformation create-stack --stack-name $USAGE_REPORT_CFN_STACK_NAME \
 --parameters \
 ParameterKey=EKSClusterName,ParameterValue=$EKS_CLUSTER_NAME ParameterKey=HyperPodClusterId,ParameterValue=$HYPERPOD_CLUSTER_ID ParameterKey=InstallPodIdentityAddon,ParameterValue=false
 ```
+- If the EKS AccessEntry for the role already exists, the stack deployment may fail with the error: `The specified access entry resource is already in use on this cluster`.
+  We recommend removing the AccessEntry to allow the CloudFormation stack to create it.
 
 ### Step 2: Install Helm Chart
 To configure the connection to your cluster, run
