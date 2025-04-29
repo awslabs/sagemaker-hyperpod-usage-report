@@ -63,3 +63,10 @@ spec:
               value: {{ .Values.clusterName }}
             - name: BUCKET_NAME
               value: {{ .Values.s3BucketName }}
+          resources:
+            requests:
+              memory: {{ .Values.resources.requests.memory | quote }}
+              cpu: {{ .Values.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.resources.limits.memory | quote }}
+              cpu: {{ .Values.resources.limits.cpu | quote }}
