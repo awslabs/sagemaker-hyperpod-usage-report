@@ -1058,7 +1058,16 @@ Resources:
                     return query_template.replace('{year}', self.yesterday.strftime('%Y'))\
                                       .replace('{month}', self.yesterday.strftime('%m'))\
                                       .replace('{day}', self.yesterday.strftime('%d'))
-
+                
+                def repair_tables(self) -> bool:
+                    tables = ['clusterqueue', 'workload', 'pod', 'heartdub']
+                    for table in tables:
+                        repair_query = f"MSCK REPAIR TABLE {table}"
+                        status, query_status, query_execution_id = self.execute_query(repair_query)      
+                        if status != "SUCCEEDED":
+                            return False
+                    return True
+                        
                 def execute_aggregation(self, query_type: QueryType):
                     try:
                         query_template = self.get_query_template(query_type)
@@ -1086,6 +1095,11 @@ Resources:
                 """
                 dry_run = event.get('dry_run', False)
                 executor = AthenaQueryExecutor(dry_run)
+                if not self.repair_tables():
+                    return {
+                          'statusCode': 500,
+                          'body': f"Failed to repair database tables for querying."
+                      }
                 results = []
                 for query_type in QueryType:
                     result = executor.execute_aggregation(query_type)
