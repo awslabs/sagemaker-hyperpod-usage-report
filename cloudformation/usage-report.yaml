@@ -1095,7 +1095,7 @@ Resources:
                 """
                 dry_run = event.get('dry_run', False)
                 executor = AthenaQueryExecutor(dry_run)
-                if not self.repair_tables():
+                if not executor.repair_tables():
                     return {
                           'statusCode': 500,
                           'body': f"Failed to repair database tables for querying."
