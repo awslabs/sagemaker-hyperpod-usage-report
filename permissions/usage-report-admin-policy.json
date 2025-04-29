@@ -201,6 +201,9 @@
             "Effect": "Allow",
             "Action": [
                 "athena:GetWorkGroup",
+                "athena:UpdateWorkGroup",
+                "athena:CreateWorkGroup",
+                "athena:DeleteWorkGroup",
                 "athena:StartQueryExecution",
                 "athena:GetQueryExecution",
                 "athena:GetQueryResults",
