@@ -10,7 +10,7 @@ class S3Uploader:
             s3_client = boto3.client("s3")
             parts = output_location.rstrip('/').split("/")
             bucket = parts[2]
-            key = f"{'/'.join(parts[3:])}/{os.path.basename(file_path)}"
+            key = f"{'/'.join(parts[3:])}/{os.path.basename(file_path)}" if len(parts) > 3 else os.path.basename(file_path)
 
             s3_client.upload_file(file_path, bucket, key)
             print(
