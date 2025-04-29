@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: sagemaker-hyperpod-usage-report
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  annotations:
+    meta.helm.sh/release-name: sagemaker-hyperpod-usage-report
+    meta.helm.sh/release-namespace: default
