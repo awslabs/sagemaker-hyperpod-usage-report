@@ -31,3 +31,11 @@ serviceAccount:
 
 rbac:
   create: true
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "15m"
+  limits:
+    memory: "1024Mi"
+    cpu: "50m"
