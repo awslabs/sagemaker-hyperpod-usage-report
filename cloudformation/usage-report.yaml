@@ -478,6 +478,13 @@ Resources:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
         - !Ref LambdaExecutionRolePolicy
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt AggregationLambda.Arn
+      Action: 'lambda:InvokeFunction'
+      Principal: 'events.amazonaws.com'
+      SourceArn: !GetAtt AggregationRule.Arn
   LambdaExecutionRolePolicy:
     Type: "AWS::IAM::ManagedPolicy"
     Properties:
