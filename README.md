@@ -1,5 +1,7 @@
 # HyperPod Cluster Usage Report
 
+## Overview
+
 Usage reporting in SageMaker HyperPod EKS-orchestrated clusters provides visibility into compute resource consumption. The capability allows organizations to implement transparent cost attribution, allocating cluster costs to teams, projects, or departments **based on their actual usage**. By tracking metrics such as GPU/CPU hours, and Neuron Core utilization over time, usage reporting complements SageMaker HyperPod's [Task Governance](https://docs.aws.amazon.com/sagemaker/latest/dg/sagemaker-hyperpod-eks-operate-console-ui-governance.html) functionality, ensuring fair cost attribution in shared multi-tenant clusters by: 
 - Eliminating guesswork in cost allocation
 - Directly linking expenses to measurable resource consumption
@@ -7,24 +9,22 @@ Usage reporting in SageMaker HyperPod EKS-orchestrated clusters provides visibil
 
 
 
-**Table of contents**
+## Table of Contents
 
-- [Set up Usage Reporting](#set-up-usage-reporting)
-  - [Prerequisites](#prerequisites)
-  - [Install Usage Report Infrastructure using CloudFormation](#install-usage-report-infrastructure-using-cloudformation)
-  - [Install Usage Report Kubernetes Operator using Helm](#install-usage-report-kubernetes-operator-using-helm)
-- [Generate Reports](#generate-reports)
-- [Clean Up Resources](#clean-up-resources)
-- [Local Development](#local-development) 
-- [Attributions and Open Source Acknowledgments](#attributions-and-open-source-acknowledgments)
-- [Contributing](#contributing)
-- [License](#license)
+1. [Set up Usage Reporting](#set-up-usage-reporting)
+    - [Prerequisites](#prerequisites)
+    - [Install Usage Report Infrastructure using CloudFormation](#install-usage-report-infrastructure-using-cloudformation)
+    - [Install Usage Report Kubernetes Operator using Helm](#install-usage-report-kubernetes-operator-using-helm)
+1. [Generate Reports](#generate-reports)
+1.[Clean Up Resources](#clean-up-resources)
+1. [Local Development](#local-development) 
+1. [Attributions and Open Source Acknowledgments](#attributions-and-open-source-acknowledgments)
+1. [Contributing](#contributing)
+1. [License](#license)
 
 
 
 ## Set up Usage Reporting
-
-### Overview
 
 Usage reporting in SageMaker HyperPod requires deploying the SageMaker HyperPod usage report infrastructure using a CloudFormation stack and installing the SageMaker HyperPod usage report Kubernetes operator using a Helm chart.
 
@@ -44,28 +44,6 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     git clone https://github.com/awslabs/sagemaker-hyperpod-usage-report
     ```
 
-* Attach the `usage-report-admin-policy.json` IAM policy to the IAM Admin role who performs AWS CLI and helm operations. This ensures Administrators have the required permissions to install and manage SageMaker HyperPod Usage report data capture.
-
-    You can find the JSON file of this policy in `sagemaker-hyperpod-usage-report/permissions/usage-report-admin-policy.json`.
-
-
-    To embed the inline policy in an existing role, use the following command:
-
-    ```sh
-    aws iam put-role-policy \
-    --role-name <Your usage report admin role name> \
-    --policy-name SageMakerHyperPodUsageReportPolicy \
-    --policy-document file://permissions/usage-report-admin-policy.json
-    ```
-
-    To verify that the policy has been added correctly, run:
-
-    ```sh
-    aws iam get-role-policy \
-    --role-name <Your usage report admin role name> \
-    --policy-name SageMakerHyperPodUsageReportPolicy
-    ```
-
 * Set the following local environment variables in your terminal:
 
     ```sh
@@ -74,8 +52,8 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     export AWS_REGION=<region>
     export HYPERPOD_CLUSTER_NAME=<hyperpod cluster name>
     export EKS_CLUSTER_NAME=<eks cluster name>
-    export USAGE_REPORT_ROLE_NAME=<usage report IAM role name>
-    export USAGE_REPORT_CFN_STACK_NAME=sagemaker-hyperpod-usage-report
+    export USAGE_REPORT_ROLE_NAME=<usage report IAM role name - see role in the previous step>
+    export USAGE_REPORT_OPERATOR_NAME=sagemaker-usage-report <keep under 22 characters if custom>
     export HYPERPOD_CLUSTER_ID=$(aws sagemaker describe-cluster --cluster-name ml-cluster --region $AWS_REGION | jq -r '.ClusterArn | split("/")[-1]')
 
     aws configure set region $AWS_REGION
@@ -87,18 +65,18 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     echo "HYPERPOD_CLUSTER_NAME is $HYPERPOD_CLUSTER_NAME"
     echo "EKS_CLUSTER_NAME is $EKS_CLUSTER_NAME"
     echo "USAGE_REPORT_ROLE_NAME is $USAGE_REPORT_ROLE_NAME"
-    echo "USAGE_REPORT_CFN_STACK_NAME is $USAGE_REPORT_CFN_STACK_NAME"
+    echo "USAGE_REPORT_OPERATOR_NAME is $USAGE_REPORT_OPERATOR_NAME"
     echo "HYPERPOD_CLUSTER_ID is $HYPERPOD_CLUSTER_ID"
     ```
-* Create a dedicated Kubernetes namespace for the usage report operator:
-
-  * Start by running the `aws eks update-kubeconfig` command to update your local kube config file (located at ~/.kube/config) with the credentials and configuration needed to connect to your EKS cluster using the kubectl command.
+*   Set up `kubectl` authentication and context for accessing the EKS cluster
+  
+    * Start by running the `aws eks update-kubeconfig` command to update your local kube config file (located at ~/.kube/config) with the credentials and configuration needed to connect to your EKS cluster using the `kubectl` command.
 
         ```sh
         aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
         ```
 
-  * You can verify that you are connected to the EKS cluster by running:
+    * You can verify that you are connected to the EKS cluster by running:
 
         ```sh
         kubectl config current-context 
@@ -106,9 +84,50 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
         `arn:aws:eks:us-west-2:xxxxxxxxxxxx:cluster/hyperpod-eks-cluster`
 
+  * Update the IAM permissions of your admin role.
+    * Populate your IAM permissions JSON file from the template provided in `permissions/usage-report-admin-policy.json.template`
+      ```sh
+      INPUT_FILE="permissions/usage-report-admin-policy.json.template"
+      OUTPUT_FILE="permissions/usage-report-admin-policy.json"
+      sed \
+      -e "s/AWS_REGION/$AWS_REGION/g" \
+      -e "s/AWS_ACCOUNT/$AWS_ACCOUNT/g" \
+      -e "s/USAGE_REPORT_OPERATOR_NAME/$USAGE_REPORT_OPERATOR_NAME/g" \
+      -e "s/HYPERPOD_CLUSTER_ID/$HYPERPOD_CLUSTER_ID/g" \
+      -e "s/EKS_CLUSTER_NAME/$EKS_CLUSTER_NAME/g" \
+      -e "s/USAGE_REPORT_ROLE_NAME/$USAGE_REPORT_ROLE_NAME/g" \
+      "$INPUT_FILE" > "$OUTPUT_FILE"
+      ```
+    * Attach the `permissions/usage-report-admin-policy.json` IAM policy to the IAM admin role who performs AWS CLI and helm operations. This ensures administrators have the required permissions to install and manage SageMaker HyperPod Usage report data capture.
+
+      To embed the inline policy in an existing role, use the following command:
+
+      ```sh
+      aws iam put-role-policy \
+      --role-name $USAGE_REPORT_ROLE_NAME  \
+      --policy-name sagemaker-hyperpod-usage-report \
+      --policy-document file://permissions/usage-report-admin-policy.json
+      ```
+
+      To verify that the policy has been added correctly, run:
+
+      ```sh
+      aws iam get-role-policy \
+      --role-name $USAGE_REPORT_ROLE_NAME \
+      --policy-name sagemaker-hyperpod-usage-report
+      ```
+
+* Create a dedicated Kubernetes namespace for the usage report operator:
+
    * In `sagemaker-hyperpod-usage-report`, run the following command to create the namespace `sagemaker-hyperpod-usage-report`: 
 
       ```sh
+      INPUT_FILE="permissions/usage-report-namespace.yaml.template"
+      OUTPUT_FILE="permissions/usage-report-namespace.yaml"
+      sed \
+      -e "s/NAMESPACE/$USAGE_REPORT_OPERATOR_NAME/g" \
+      "$INPUT_FILE" > "$OUTPUT_FILE"
+
       kubectl apply -f permissions/usage-report-namespace.yaml
       ```
 
@@ -117,6 +136,13 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     * In `sagemaker-hyperpod-usage-report`, run the following command to setup the RBAC permissions in your EKS cluster.
 
         ```sh
+        INPUT_FILE="permissions/usage-report-admin-cluster-policy.yaml.template"
+        OUTPUT_FILE="permissions/usage-report-admin-cluster-policy.yaml"
+        sed \
+        -e "s/NAMESPACE/$USAGE_REPORT_OPERATOR_NAME/g" \
+        -e "s/ROLE_NAME/$USAGE_REPORT_INSTALLER_ROLE_NAME/g" \
+        "$INPUT_FILE" > "$OUTPUT_FILE"
+
         kubectl apply -f permissions/usage-report-admin-cluster-policy.yaml
         ```
 
@@ -165,6 +191,8 @@ aws cloudformation create-stack \
 --parameters \
 ParameterKey=EKSClusterName,ParameterValue=$EKS_CLUSTER_NAME \
 ParameterKey=HyperPodClusterId,ParameterValue=$HYPERPOD_CLUSTER_ID \
+ParameterKey=UsageReportOperatorNameSpace,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
+ParameterKey=OperatorServiceAccount,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
 ParameterKey=UsageReportRoleName,ParameterValue=$USAGE_REPORT_ROLE_NAME
 ```
 
@@ -200,6 +228,8 @@ aws cloudformation describe-stacks --stack-name $USAGE_REPORT_CFN_STACK_NAME \
   ParameterKey=EKSClusterName,ParameterValue=$EKS_CLUSTER_NAME \
   ParameterKey=HyperPodClusterId,ParameterValue=$HYPERPOD_CLUSTER_ID \
   ParameterKey=UsageReportRoleName,ParameterValue=$USAGE_REPORT_ROLE_NAME \
+  ParameterKey=UsageReportOperatorNameSpace,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
+  ParameterKey=OperatorServiceAccount,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
   ParameterKey=InstallPodIdentityAddon,ParameterValue=false
   ```
 * If you have previously created CloudFormation resources in the same region and account, and you encounter issues with your Athena tables, you may need to run the `MSCK REPAIR TABLE` command in the Athena query editor to repair the resources.
@@ -234,11 +264,22 @@ You can configure the Helm chart by either updating the `values.yaml` file or by
 To install the Helm chart, run the following command:
 ```sh
 cd helm_chart
-helm install sagemaker-hyperpod-usage-report \
+# retrieve s3 bucket name
+USAGE_REPORT_S3_BUCKET=$(aws cloudformation describe-stack-resources \
+--stack-name $USAGE_REPORT_OPERATOR_NAME \
+--query 'StackResources[?ResourceType==`AWS::S3::Bucket`].PhysicalResourceId' \
+--output text)
+
+# verification
+echo $USAGE_REPORT_S3_BUCKET
+
+helm install $USAGE_REPORT_OPERATOR_NAME \
 ./SageMakerHyperPodUsageReportChart \
 --set region=$AWS_REGION \
+--set namespace=$USAGE_REPORT_OPERATOR_NAME \
+--set serviceAccount.name=$USAGE_REPORT_OPERATOR_NAME \
 --set clusterName=$HYPERPOD_CLUSTER_NAME \
---set s3BucketName=$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_CLUSTER_ID-usage-report
+--set s3BucketName=$USAGE_REPORT_S3_BUCKET
 ```
 
 #### Verify the Operator Installation
@@ -263,6 +304,21 @@ You can use the `run.py` script to extract and export usage metrics for your Sag
 ```sh
 cd sagemaker-hyperpod-usage-report/report_generation
 pip install -e .
+
+# retrieve Athena database name
+USAGE_REPORT_DATABASE=$(aws cloudformation describe-stack-resources \
+--stack-name $USAGE_REPORT_OPERATOR_NAME \
+--query 'StackResources[?ResourceType==`AWS::Glue::Database`].PhysicalResourceId' \
+--output text)
+
+DATABASE_WORKGROUP_NAME=$(aws cloudformation describe-stack-resources \
+--stack-name $USAGE_REPORT_OPERATOR_NAME \
+--query 'StackResources[?ResourceType==`AWS::Athena::WorkGroup`].PhysicalResourceId' \
+--output text)
+
+# verification
+echo $USAGE_REPORT_DATABASE
+echo $DATABASE_WORKGROUP_NAME
 ```
 
 ### Generate the Report
@@ -271,52 +327,42 @@ To generate a usage report and export it to a specified S3 bucket, provide the f
 ### Parameters for the run.py Script
 | Parameter             | Description                             | Example Value  | Required |
 |-----------------------|-----------------------------------------|----------------|----------|
-| --start-date          | Beginning date for report data         | 2025-04-15     | Yes      |
-| --end-date            | Ending date for report data            | 2025-04-17     | Yes      |
-| --format              | Output format of the report            | csv            | Yes      |
-| --database-name       | Name of the database to query          | usage_report   | Yes      |
-| --type                | Type of report to generate             | summary        | Yes      |
-| --output-report-location | Directory where report will be saved | s3://bucket-name/path | Yes      |
-| --cluster-name        | Name of the HyperPod cluster           | my-hyperpod-cluster | Yes      |
+| --start-date          | Beginning date for report data         | `2025-04-15`     | Yes      |
+| --end-date            | Ending date for report data            |`2025-04-17`     | Yes      |
+| --format              | Output format of the report            | `csv` or `pdf`     | Yes      |
+| --database-name       | Name of the database to query          | `usage_report`   | Yes      |
+| --database-workgroup-name       | Name of Athena's workgroup          | `usage_report_workgroup`   | Yes      |
+| --type                | Type of report to generate             | `detailed` or `summary`        | Yes      |
+| --output-report-location | Directory where report will be saved | `s3://bucket-name/path` | Yes      |
+| --cluster-name        | Name of the HyperPod cluster           | `my-hyperpod-cluster` | Yes      |
 
-**Note:** Select a date range that falls within the previous 180 days from the current date (unless you customized the `DataRententionDays` when installing the CloudFormation stack).
+**Note:** 
+- Select a date range that falls within the previous 180 days from the current date (unless you customized the `DataRententionDays` when installing the CloudFormation stack).
+
+- A good practice is to create a separate folder in your S3 bucket to serve as the destination for generated usage reports.
 
 Use the following command to generate and export the report:
 ```sh
 python run.py \
 --start-date <Start date of the report, i.e. 2025-04-22> \
 --end-date <End date of the report, i.e. 2025-04-22> \
---format csv \
---database-name usage_report \
---type summary \
---output-report-location s3://$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_CLUSTER_ID-usage-report/<usage_report_output/> \
+--format <csv or pdf> \
+--database-name $USAGE_REPORT_DATABASE \
+--database-workgroup-name $DATABASE_WORKGROUP_NAME \
+--type <detailed or summary> \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/<usage_report_output/> \
 --cluster-name $HYPERPOD_CLUSTER_NAME
 ```
+**Note**
+* Ensure that the S3 bucket specified in `--output-report-location` has the necessary permissions to accept the report files.
+* The `cluster-name` should match the name of your SageMaker HyperPod cluster.
+* You can find all original captured data in the `raw` directory of your S3 bucket `$USAGE_REPORT_S3_BUCKET/raw` or in the Athena console.</para>
 
-**Note:** A good practice is to create a separate folder in your S3 bucket to serve as the destination for generated usage reports.
 
 ### Output File Naming Convention
 The output file follows the naming convention: `<report-type>-report-<start-date>-<end-date>.<format>`.
 
-For example, a summary report for the dates April 15, 2025, to April 17, 2025, in CSV format will be named `summary-report-2025-04-15-2025-04-17.csv` and will be located in the specified output directory of your S3 bucket.
-
-Here's an example command to generate a summary report in CSV format for the dates April 15, 2025, to April 17, 2025:
-```sh
-python run.py \ 
---start-date 2025-04-15 \ 
---end-date 2025-04-17 \ 
---format csv \ 
---database-name usage_report \ 
---type summary \ 
---output-report-location s3://$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_CLUSTER_ID-usage-report/<usage_report_output/> \
---cluster-name my-hyperpod-cluster
-```
-
-This creates a file named `summary-report-2025-04-15-2025-04-17.csv` in the S3 bucket specified by the `--output-report-location` parameter.
-
-**Note**
-* Ensure that the S3 bucket specified in `--output-report-location` has the necessary permissions to accept the report files.
-* The `cluster-name` should match the name of your SageMaker HyperPod cluster.
+For example, a summary report for the dates April 15, 2025, to April 17, 2025, in CSV format will be named `summary-report-2025-04-15-2025-04-17.csv` and will be located in the specified output directory `--output-report-location` of your S3 bucket.
 
 
 ## Clean Up Resources
@@ -338,21 +384,19 @@ aws cloudformation describe-stacks --region $AWS_REGION --stack-name $USAGE_REPO
 ```
 
 **Note:** To prevent accidental deletion, you should delete the S3 buckets created by the CloudFormation stack manually:
-- `$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_ID-usage-report`
+- `$USAGE_REPORT_S3_BUCKET`
 - `aws-athena-query-results-$AWS_ACCOUNT-$AWS_REGION`
 
 ### Delete the Kubernetes Resources
 To uninstall the Helm chart, run the following command:
 ```sh
 cd sagemaker-hyperpod-usage-report/helm_chart
-helm uninstall sagemaker-hyperpod-usage-report
+helm uninstall $USAGE_REPORT_OPERATOR_NAME
 ```
 
 Ensure that you uninstalled the SageMaker HyperPod usage report Kubernetes operator:
 ```sh
-kubectl logs -n sagemaker-hyperpod-usage-report \
-$(kubectl get pods -n sagemaker-hyperpod-usage-report -o name \
-| grep "^pod/sagemaker-hyperpod-usage-report-" | head -n 1)
+kubectl logs $(kubectl get pods -o name | grep "^pod/sagemaker-hyperpod-usage-report-" | head -n 1)
 ```
 
 ## Local Development
