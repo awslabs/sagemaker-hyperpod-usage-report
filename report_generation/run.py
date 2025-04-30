@@ -23,6 +23,11 @@ def main():
     )
     parser.add_argument("--database-name", required=True, help="Athena database name")
     parser.add_argument(
+        "--database-workgroup-name",
+        required=True,
+        help="workgroup for the athena database",
+    )
+    parser.add_argument(
         "--type",
         choices=["summary", "detailed"],
         required=True,
@@ -34,7 +39,7 @@ def main():
         help="S3 location for output (s3://bucket/path)",
     )
     parser.add_argument("--cluster-name", required=True, help="Hyperpod Cluster Name")
-
+    
     args = parser.parse_args()
 
     generator = ReportGenerator(
@@ -42,6 +47,7 @@ def main():
         end_date=args.end_date,
         cluster_name=args.cluster_name,
         database_name=args.database_name,
+        database_workgroup_name=args.database_workgroup_name,
         report_type=args.type,
         output_location=args.output_report_location,
         format=args.format,

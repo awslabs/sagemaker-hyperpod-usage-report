@@ -6,9 +6,10 @@
             "Action": [
                 "cloudformation:CreateStack",
                 "cloudformation:DeleteStack",
-                "cloudformation:DescribeStacks"
+                "cloudformation:DescribeStacks",
+                "cloudformation:DescribeStackResources"
             ],
-            "Resource": "arn:aws:cloudformation:*:*:stack/sagemaker-hyperpod-usage-report/*"
+            "Resource": "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT:stack/USAGE_REPORT_CFN_STACK_NAME/*"
         },    
         {
             "Effect": "Allow",
@@ -24,14 +25,13 @@
                 "s3:GetBucketLocation",
                 "s3:ListBucket",
                 "s3:DeleteBucket",
-                "s3:DeleteObject",
-                "s3:DeleteObjects"
+                "s3:DeleteObject"
             ],
             "Resource": [
-                "arn:aws:s3:::*-usage-report",
-                "arn:aws:s3:::*-usage-report/*",
-                "arn:aws:s3:::aws-athena-query-results-*",
-                "arn:aws:s3:::aws-athena-query-results-*/*"
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*",
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/*",
+                "arn:aws:s3:::aws-athena-query-results-AWS_ACCOUNT-AWS_REGION",
+                "arn:aws:s3:::aws-athena-query-results-AWS_ACCOUNT-AWS_REGION/*"
             ]
         },
         {
@@ -42,8 +42,8 @@
                 "eks:DescribePodIdentityAssociation"
             ],
             "Resource": [
-                "arn:aws:eks:*:*:cluster/*",
-                "arn:aws:eks:*:*:podidentityassociation/*/*"
+                "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:cluster/EKS_CLUSTER_NAME",
+                "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:podidentityassociation/EKS_CLUSTER_NAME/*"
             ]
         },
         {
@@ -63,12 +63,17 @@
                 "glue:UpdateTable"    
             ],
             "Resource": [
-                "arn:aws:glue:*:*:catalog",
-                "arn:aws:glue:*:*:database/usage_report",
-                "arn:aws:glue:*:*:table/usage_report/*",
-                "arn:aws:glue:*:*:userDefinedFunction/usage_report/*"
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:catalog",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:database/usagereportdatabase-*",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/clusterqueue",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/detailed_report",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/heartdub",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/pod",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/summary_report",
+                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/workload"
             ]
         },
+
         {
             "Effect": "Allow",
             "Action": [
@@ -76,12 +81,12 @@
                 "s3:PutObject"
             ],
             "Resource": [
-                "arn:aws:s3:::*/raw/clusterqueue/*",
-                "arn:aws:s3:::*/raw/workload/*",
-                "arn:aws:s3:::*/raw/pod/*",
-                "arn:aws:s3:::*/reports/detailed/*",
-                "arn:aws:s3:::*/reports/summary/*",
-                "arn:aws:s3:::*/raw/heartdub/*"
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/raw/clusterqueue/*",
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/raw/workload/*",
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/raw/pod/*",
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/reports/detailed/*",
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/reports/summary/*",
+                "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*/raw/heartdub/*"
             ]
         },
         {
@@ -94,7 +99,7 @@
                 "events:DescribeRule"
             ],
             "Resource": [
-                "arn:aws:events:*:*:rule/*-AggregationRule-*"
+                "arn:aws:events:AWS_REGION:AWS_ACCOUNT:rule/USAGE_REPORT_CFN_STACK_NAME-AggregationRule-*"
             ]
         },
         {
@@ -109,7 +114,7 @@
                 "iam:DetachRolePolicy"
             ],
             "Resource": [
-                "arn:aws:iam::*:role/*-LambdaExecutionRole-*"
+                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-LambdaExecutionRole-*"
             ]
         },
         {
@@ -124,7 +129,7 @@
                 "iam:ListPolicyVersions"
             ],
             "Resource": [
-                "arn:aws:iam::*:policy/*-LambdaExecutionRolePolicy-*"
+                "arn:aws:iam::AWS_ACCOUNT:policy/USAGE_REPORT_CFN_STACK_NAME-LambdaExecutionRolePolicy-*"
             ]
         },
         {
@@ -136,7 +141,7 @@
                 "iam:PutRolePolicy",
                 "iam:DeleteRolePolicy"
             ],
-            "Resource": "arn:aws:iam::*:role/*-ServiceAccountRole-*"
+            "Resource": "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-ServiceAccountRole-*"
         },        
         {
             "Effect": "Allow",
@@ -144,8 +149,8 @@
                 "iam:PassRole"
             ],
             "Resource": [
-                "arn:aws:iam::*:role/*-LambdaExecutionRole-*",
-                "arn:aws:iam::*:role/*-ServiceAccountRole-*"
+                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-LambdaExecutionRole-*",
+                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-ServiceAccountRole-*"
             ]
         },
         {
@@ -161,7 +166,7 @@
                 "lambda:RemovePermission"
             ],
             "Resource": [
-                "arn:aws:lambda:*:*:function:*-AggregationLambda-*"
+                "arn:aws:lambda:AWS_REGION:AWS_ACCOUNT:function:USAGE_REPORT_CFN_STACK_NAME-AggregationLambda-*"
             ]
         },
         {
@@ -169,7 +174,7 @@
             "Action": [
                 "sagemaker:DescribeCluster"
             ],
-            "Resource": "arn:aws:sagemaker:*:*:cluster/*"
+            "Resource": "arn:aws:sagemaker:AWS_REGION:AWS_ACCOUNT:cluster/HYPERPOD_CLUSTER_ID"
         },
         {
             "Effect": "Allow",
@@ -177,7 +182,7 @@
                 "eks:DescribeCluster",
                 "eks:ListClusters"
             ],
-            "Resource": "arn:aws:eks:*:*:cluster/*"
+            "Resource": "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:cluster/EKS_CLUSTER_NAME"
         },
         {
             "Effect": "Allow",
@@ -189,8 +194,8 @@
                 "eks:DeleteAccessEntry"
             ],
             "Resource": [
-                "arn:aws:eks:*:*:cluster/*",
-                "arn:aws:eks:*:*:access-entry/*"
+                "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:cluster/EKS_CLUSTER_NAME",
+                "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:access-entry/EKS_CLUSTER_NAME/role/AWS_ACCOUNT/USAGE_REPORT_ROLE_NAME/*"
             ]
         },
         {
@@ -200,7 +205,7 @@
                 "eks:DeleteAddon", 
                 "eks:DescribeAddon"
             ],
-            "Resource": "arn:aws:eks:*:*:cluster/*"
+            "Resource": "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:cluster/EKS_CLUSTER_NAME"
         },
         {
             "Effect": "Allow",
@@ -215,7 +220,7 @@
                 "athena:StopQueryExecution"
             ],
             "Resource": [
-                "arn:aws:athena:*:*:workgroup/*"
+                "arn:aws:athena:AWS_REGION:AWS_ACCOUNT:workgroup/AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*"
             ]
         }              
     ]
