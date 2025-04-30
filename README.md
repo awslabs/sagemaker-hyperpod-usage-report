@@ -52,7 +52,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     export AWS_REGION=<region>
     export HYPERPOD_CLUSTER_NAME=<hyperpod cluster name>
     export EKS_CLUSTER_NAME=<eks cluster name>
-    export USAGE_REPORT_ROLE_NAME=<usage report IAM role name - see role in the previous step>
+    export USAGE_REPORT_INSTALLER_ROLE_NAME=<IAM role name used to install usage report, you can create a new role or reuse an existing one>
     export USAGE_REPORT_OPERATOR_NAME=sagemaker-usage-report <keep under 22 characters if custom>
     export HYPERPOD_CLUSTER_ID=$(aws sagemaker describe-cluster --cluster-name ml-cluster --region $AWS_REGION | jq -r '.ClusterArn | split("/")[-1]')
 
@@ -64,7 +64,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     echo "AWS_REGION is $AWS_REGION"
     echo "HYPERPOD_CLUSTER_NAME is $HYPERPOD_CLUSTER_NAME"
     echo "EKS_CLUSTER_NAME is $EKS_CLUSTER_NAME"
-    echo "USAGE_REPORT_ROLE_NAME is $USAGE_REPORT_ROLE_NAME"
+    echo "USAGE_REPORT_INSTALLER_ROLE_NAME is $USAGE_REPORT_INSTALLER_ROLE_NAME"
     echo "USAGE_REPORT_OPERATOR_NAME is $USAGE_REPORT_OPERATOR_NAME"
     echo "HYPERPOD_CLUSTER_ID is $HYPERPOD_CLUSTER_ID"
     ```
@@ -84,36 +84,36 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
         `arn:aws:eks:us-west-2:xxxxxxxxxxxx:cluster/hyperpod-eks-cluster`
 
-  * Update the IAM permissions of your admin role.
-    * Populate your IAM permissions JSON file from the template provided in `permissions/usage-report-admin-policy.json.template`
+  * Attach the IAM policy to your installed role.
+    * Populate your IAM permissions JSON file from the template provided in `permissions/usage-report-installer-policy.json.template`
       ```sh
-      INPUT_FILE="permissions/usage-report-admin-policy.json.template"
-      OUTPUT_FILE="permissions/usage-report-admin-policy.json"
+      INPUT_FILE="permissions/usage-report-installer-policy.json.template"
+      OUTPUT_FILE="permissions/usage-report-installer-policy.json"
       sed \
       -e "s/AWS_REGION/$AWS_REGION/g" \
       -e "s/AWS_ACCOUNT/$AWS_ACCOUNT/g" \
       -e "s/USAGE_REPORT_OPERATOR_NAME/$USAGE_REPORT_OPERATOR_NAME/g" \
       -e "s/HYPERPOD_CLUSTER_ID/$HYPERPOD_CLUSTER_ID/g" \
       -e "s/EKS_CLUSTER_NAME/$EKS_CLUSTER_NAME/g" \
-      -e "s/USAGE_REPORT_ROLE_NAME/$USAGE_REPORT_ROLE_NAME/g" \
+      -e "s/USAGE_REPORT_INSTALLER_ROLE_NAME/$USAGE_REPORT_INSTALLER_ROLE_NAME/g" \
       "$INPUT_FILE" > "$OUTPUT_FILE"
       ```
-    * Attach the `permissions/usage-report-admin-policy.json` IAM policy to the IAM admin role who performs AWS CLI and helm operations. This ensures administrators have the required permissions to install and manage SageMaker HyperPod Usage report data capture.
+    * Attach the `permissions/usage-report-installer-policy.json` IAM policy to the IAM installer role who performs AWS CLI and helm operations. This ensures usage report installer have the required permissions to install and manage SageMaker HyperPod Usage report data capture.
 
       To embed the inline policy in an existing role, use the following command:
 
       ```sh
       aws iam put-role-policy \
-      --role-name $USAGE_REPORT_ROLE_NAME  \
+      --role-name $USAGE_REPORT_INSTALLER_ROLE_NAME  \
       --policy-name sagemaker-hyperpod-usage-report \
-      --policy-document file://permissions/usage-report-admin-policy.json
+      --policy-document file://permissions/usage-report-installer-policy.json
       ```
 
       To verify that the policy has been added correctly, run:
 
       ```sh
       aws iam get-role-policy \
-      --role-name $USAGE_REPORT_ROLE_NAME \
+      --role-name $USAGE_REPORT_INSTALLER_ROLE_NAME \
       --policy-name sagemaker-hyperpod-usage-report
       ```
 
@@ -136,14 +136,14 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     * In `sagemaker-hyperpod-usage-report`, run the following command to setup the RBAC permissions in your EKS cluster.
 
         ```sh
-        INPUT_FILE="permissions/usage-report-admin-cluster-policy.yaml.template"
-        OUTPUT_FILE="permissions/usage-report-admin-cluster-policy.yaml"
+        INPUT_FILE="permissions/usage-report-installer-cluster-policy.yaml.template"
+        OUTPUT_FILE="permissions/usage-report-installer-cluster-policy.yaml"
         sed \
         -e "s/NAMESPACE/$USAGE_REPORT_OPERATOR_NAME/g" \
         -e "s/ROLE_NAME/$USAGE_REPORT_INSTALLER_ROLE_NAME/g" \
         "$INPUT_FILE" > "$OUTPUT_FILE"
 
-        kubectl apply -f permissions/usage-report-admin-cluster-policy.yaml
+        kubectl apply -f permissions/usage-report-installer-cluster-policy.yaml
         ```
 
     * Enable the access entry for the EKS cluster.
@@ -156,6 +156,8 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
 
 ### Install SageMaker HyperPod Usage Report Infrastructure using CloudFormation
+
+> The following installation assume you are using the role USAGE_REPORT_INSTALLER_ROLE_NAME you specified above.
 
 #### Retrieve the CloudFormation Template
 
@@ -171,8 +173,7 @@ You can find the CloudFormation template in the `/cloudformation` directory. The
 |----------------------------|----------|---------------------------------------|---------------------------------------------------------------------------------------------|
 | EKSClusterName             | Yes      | -                                     | Name of the EKS cluster                                                                     |
 | HyperPodClusterId          | Yes      | -                                     | Id of the HyperPod cluster                                                                  |
-| UsageReportRoleName        | Yes      | -                                     | Name of the IAM role for usage reporting                                                    |
-| AthenaDBName               | No       | usage_report                          | Name of S3 Athena database                                                                  |
+| UsageReportInstallerRoleName        | Yes      | -                                     | Name of the IAM role for usage reporting installation                                                    |
 | DataRententionDays         | No       | 180                                   | Data retention days for S3 Bucket                                                           |
 | InstallPodIdentityAddon    | No       | "true"                                | Whether to install the Pod Identity Addon. Allowed values: "true", "false"                  |
 | UsageReportOperatorNameSpace | No      | sagemaker-hyperpod-usage-report       | Kubernetes cluster namespace where usage report operator is installed                       |
@@ -185,7 +186,7 @@ Run the following stack creation command:
 cd sagemaker-hyperpod-usage-report
 aws cloudformation create-stack \
 --region $AWS_REGION \
---stack-name $USAGE_REPORT_CFN_STACK_NAME \
+--stack-name $USAGE_REPORT_OPERATOR_NAME \
 --template-body file://cloudformation/usage-report.yaml \
 --capabilities CAPABILITY_NAMED_IAM \
 --parameters \
@@ -193,12 +194,12 @@ ParameterKey=EKSClusterName,ParameterValue=$EKS_CLUSTER_NAME \
 ParameterKey=HyperPodClusterId,ParameterValue=$HYPERPOD_CLUSTER_ID \
 ParameterKey=UsageReportOperatorNameSpace,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
 ParameterKey=OperatorServiceAccount,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
-ParameterKey=UsageReportRoleName,ParameterValue=$USAGE_REPORT_ROLE_NAME
+ParameterKey=UsageReportInstallerRoleName,ParameterValue=$USAGE_REPORT_INSTALLER_ROLE_NAME
 ```
 
 Verify the CloudFormation stack creation status:
 ```sh
-aws cloudformation describe-stacks --stack-name $USAGE_REPORT_CFN_STACK_NAME \
+aws cloudformation describe-stacks --stack-name $USAGE_REPORT_OPERATOR_NAME \
 --region $AWS_REGION --query 'Stacks[0].StackStatus' --output text
 ```
 
@@ -207,13 +208,12 @@ aws cloudformation describe-stacks --stack-name $USAGE_REPORT_CFN_STACK_NAME \
 |-------------------|------------------------------------------|
 | DatabaseName      | Name of the created database             |
 | UsageReportBucket | Name of the created S3 Bucket            |
-| AthenaRoleArn     | ARN of the IAM role for Athena           |
 
 #### Note
 * If the CloudFormation stack status indicates a `ROLLBACK` state, you can investigate the failure reason by using the AWS CLI command below or by checking the AWS CloudFormation console directly:
   ```sh
   aws cloudformation describe-stack-events \
-      --stack-name $USAGE_REPORT_CFN_STACK_NAME \
+      --stack-name $USAGE_REPORT_OPERATOR_NAME \
       --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].[LogicalResourceId,ResourceStatusReason]'
   ```
 * Ensure that the `eks-auth:AssumeRoleForPodIdentity` permission is included in the IAM execution role for the SageMaker HyperPod cluster.
@@ -221,18 +221,17 @@ aws cloudformation describe-stacks --stack-name $USAGE_REPORT_CFN_STACK_NAME \
   ```sh
   aws cloudformation create-stack \
   --region $AWS_REGION \
-  --stack-name $USAGE_REPORT_CFN_STACK_NAME \
+  --stack-name $USAGE_REPORT_OPERATOR_NAME \
   --template-body file://cloudformation/usage-report.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameters \
   ParameterKey=EKSClusterName,ParameterValue=$EKS_CLUSTER_NAME \
   ParameterKey=HyperPodClusterId,ParameterValue=$HYPERPOD_CLUSTER_ID \
-  ParameterKey=UsageReportRoleName,ParameterValue=$USAGE_REPORT_ROLE_NAME \
+  ParameterKey=UsageReportInstallerRoleName,ParameterValue=$USAGE_REPORT_INSTALLER_ROLE_NAME \
   ParameterKey=UsageReportOperatorNameSpace,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
   ParameterKey=OperatorServiceAccount,ParameterValue=$USAGE_REPORT_OPERATOR_NAME \
   ParameterKey=InstallPodIdentityAddon,ParameterValue=false
   ```
-* If you have previously created CloudFormation resources in the same region and account, and you encounter issues with your Athena tables, you may need to run the `MSCK REPAIR TABLE` command in the Athena query editor to repair the resources.
 
 
 ### Install the SageMaker HyperPod Usage Report Kubernetes Operator using Helm
@@ -289,6 +288,7 @@ kubectl logs -n sagemaker-hyperpod-usage-report \
 $(kubectl get pods -n sagemaker-hyperpod-usage-report -o name \
 | grep "^pod/sagemaker-hyperpod-usage-report-" | sed -n '2p')
 ```
+After the verifcation you could start to submit jobs to the cluster and raw job usage data will be stored under `$USAGE_REPORT_S3_BUCKET/raw/`
 
 **Important**
 
@@ -322,6 +322,7 @@ echo $DATABASE_WORKGROUP_NAME
 ```
 
 ### Generate the Report
+
 To generate a usage report and export it to a specified S3 bucket, provide the following parameters to the `run.py` Python script:
 
 ### Parameters for the run.py Script
@@ -371,22 +372,6 @@ For example, a summary report for the dates April 15, 2025, to April 17, 2025, i
 
 When you no longer need your SageMaker HyperPod usage reporting infrastructure, use these steps to clean up AWS and Kubernetes resources. Proper resource deletion helps prevent unnecessary costs.
 
-### Delete the AWS Resources
-To delete the CloudFormation stack and the resources it created, run the following command:
-```sh
-aws cloudformation delete-stack --region $AWS_REGION --stack-name $USAGE_REPORT_CFN_STACK_NAME
-```
-
-Ensure that the stack is properly deleted:
-```sh
-aws cloudformation describe-stacks --region $AWS_REGION --stack-name $USAGE_REPORT_CFN_STACK_NAME \
---region $AWS_REGION --query 'Stacks[0].StackStatus' --output text
-```
-
-**Note:** To prevent accidental deletion, you should delete the S3 buckets created by the CloudFormation stack manually:
-- `$USAGE_REPORT_S3_BUCKET`
-- `aws-athena-query-results-$AWS_ACCOUNT-$AWS_REGION`
-
 ### Delete the Kubernetes Resources
 To uninstall the Helm chart, run the following command:
 ```sh
@@ -399,12 +384,29 @@ Ensure that you uninstalled the SageMaker HyperPod usage report Kubernetes opera
 kubectl logs $(kubectl get pods -o name | grep "^pod/sagemaker-hyperpod-usage-report-" | head -n 1)
 ```
 
+### Delete the AWS Resources
+To delete the CloudFormation stack and the resources it created, run the following command:
+```sh
+aws cloudformation delete-stack --region $AWS_REGION --stack-name $USAGE_REPORT_OPERATOR_NAME
+```
+
+Ensure that the stack is properly deleted:
+```sh
+aws cloudformation describe-stacks --region $AWS_REGION --stack-name $USAGE_REPORT_OPERATOR_NAME \
+--region $AWS_REGION --query 'Stacks[0].StackStatus' --output text
+```
+
+**Note:** To prevent accidental deletion, you should delete the S3 buckets created by the CloudFormation stack manually:
+- `$USAGE_REPORT_S3_BUCKET`
+- `aws-athena-query-results-$AWS_ACCOUNT-$AWS_REGION`
+
 ## Local Development
 
 ### Running Unit Tests
 
 To run the unit tests locally:
 ```bash
+cd report_generation
 pytest
 ```
 This will execute all test cases in the test directory. The test suite includes unit tests for all major components of the usage report functionality.
