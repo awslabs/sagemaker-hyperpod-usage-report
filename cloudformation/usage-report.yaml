@@ -8,9 +8,9 @@ Parameters:
   HyperPodClusterId:
     Type: String
     Description: Id of the HyperPod cluster
-  UsageReportRoleName:
+  UsageReportInstallerRoleName:
     Type: String
-    Description: Name of the IAM role for usage reporting
+    Description: Name of the IAM role for usage reporting installation
   DataRententionDays:
     Type: Number
     Description: Data rentention day for S3 Bucket
@@ -69,11 +69,11 @@ Resources:
     Type: AWS::EKS::AccessEntry
     Properties:
       ClusterName: !Ref EKSClusterName
-      PrincipalArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${UsageReportRoleName}'
+      PrincipalArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${UsageReportInstallerRoleName}'
       Type: STANDARD
       KubernetesGroups: 
-        - !Sub ${UsageReportRoleName}-Role
-      Username: !Sub ${UsageReportRoleName}-Role
+        - !Sub ${UsageReportInstallerRoleName}-Role
+      Username: !Sub ${UsageReportInstallerRoleName}-Role
   # Pod identity resources setup
   ServiceAccountRole:
     Type: 'AWS::IAM::Role'

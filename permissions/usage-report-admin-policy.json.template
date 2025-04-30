@@ -191,7 +191,7 @@
             ],
             "Resource": [
                 "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:cluster/EKS_CLUSTER_NAME",
-                "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:access-entry/EKS_CLUSTER_NAME/role/AWS_ACCOUNT/USAGE_REPORT_ROLE_NAME/*"
+                "arn:aws:eks:AWS_REGION:AWS_ACCOUNT:access-entry/EKS_CLUSTER_NAME/role/AWS_ACCOUNT/USAGE_REPORT_INSTALLER_ROLE_NAME/*"
             ]
         },
         {
