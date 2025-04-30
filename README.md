@@ -80,6 +80,16 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
     aws configure set region $AWS_REGION
     ```
+    Verify the content of your variables:
+    ```sh
+    echo "AWS_ACCOUNT is $AWS_ACCOUNT"
+    echo "AWS_REGION is $AWS_REGION"
+    echo "HYPERPOD_CLUSTER_NAME is $HYPERPOD_CLUSTER_NAME"
+    echo "EKS_CLUSTER_NAME is $EKS_CLUSTER_NAME"
+    echo "USAGE_REPORT_ROLE_NAME is $USAGE_REPORT_ROLE_NAME"
+    echo "USAGE_REPORT_CFN_STACK_NAME is $USAGE_REPORT_CFN_STACK_NAME"
+    echo "HYPERPOD_CLUSTER_ID is $HYPERPOD_CLUSTER_ID"
+    ```
 * Create a dedicated Kubernetes namespace for the usage report operator:
 
     In `sagemaker-hyperpod-usage-report`, run the following command: 
