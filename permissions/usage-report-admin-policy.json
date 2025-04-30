@@ -156,7 +156,9 @@
                 "lambda:GetFunction",
                 "lambda:UpdateFunctionCode",
                 "lambda:UpdateFunctionConfiguration",
-                "lambda:DeleteFunction"
+                "lambda:DeleteFunction",
+                "lambda:AddPermission",
+                "lambda:RemovePermission"
             ],
             "Resource": [
                 "arn:aws:lambda:*:*:function:*-AggregationLambda-*"
