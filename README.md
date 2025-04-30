@@ -58,7 +58,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     --policy-document file://permissions/usage-report-admin-policy.json
     ```
 
-    To verify that the policy has been added correctly, run the following AWS CLI command:
+    To verify that the policy has been added correctly, run:
 
     ```sh
     aws iam get-role-policy \
@@ -92,27 +92,27 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     ```
 * Create a dedicated Kubernetes namespace for the usage report operator:
 
-    In `sagemaker-hyperpod-usage-report`, run the following command: 
-
-    ```sh
-    kubectl apply -f permissions/usage-report-namespace.yaml
-    ```
-
-* Create custom RBAC permissions for deploying the HyperPod usage report Kubernetes operator helm chart on the cluster:
-
-    * Run the aws eks update-kubeconfig command to update your local kube config file (located at ~/.kube/config) with the credentials and configuration needed to connect to your EKS cluster using the kubectl command.
+  * Start by running the `aws eks update-kubeconfig` command to update your local kube config file (located at ~/.kube/config) with the credentials and configuration needed to connect to your EKS cluster using the kubectl command.
 
         ```sh
         aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
         ```
 
-    * You can verify that you are connected to the EKS cluster by running this commands:
+  * You can verify that you are connected to the EKS cluster by running:
 
         ```sh
         kubectl config current-context 
         ```
 
         `arn:aws:eks:us-west-2:xxxxxxxxxxxx:cluster/hyperpod-eks-cluster`
+
+   * In `sagemaker-hyperpod-usage-report`, run the following command to create the namespace `sagemaker-hyperpod-usage-report`: 
+
+      ```sh
+      kubectl apply -f permissions/usage-report-namespace.yaml
+      ```
+
+* Create custom RBAC permissions for deploying the HyperPod usage report Kubernetes operator helm chart on the cluster:
 
     * In `sagemaker-hyperpod-usage-report`, run the following command to setup the RBAC permissions in your EKS cluster.
 
