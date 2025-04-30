@@ -1,8 +1,8 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: usage-report-role
-  namespace: sagemaker-hyperpod-usage-report
+  name: ROLE_NAME-role
+  namespace: NAMESPACE
 rules:
 - apiGroups: [""]
   resources: ["serviceaccounts"]
@@ -17,21 +17,21 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1 
 kind: RoleBinding 
 metadata: 
-  name: usage-report-binding 
-  namespace: sagemaker-hyperpod-usage-report 
+  name: ROLE_NAME-binding 
+  namespace: NAMESPACE
 subjects: 
 - kind: User 
-  name: UsageReportRole 
+  name: ROLE_NAME-Role 
   apiGroup: rbac.authorization.k8s.io 
 roleRef: 
   kind: Role 
-  name: usage-report-role 
+  name: ROLE_NAME-role 
   apiGroup: rbac.authorization.k8s.io 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: usage-report-role
+  name: ROLE_NAME-role
 rules:
 - apiGroups: ["rbac.authorization.k8s.io"]
   resources: ["clusterroles", "clusterrolebindings"]
@@ -64,12 +64,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: usage-report-binding
+  name: ROLE_NAME-binding
 subjects:
 - kind: Group
-  name: UsageReportRole
+  name: ROLE_NAME-Role
   apiGroup: rbac.authorization.k8s.io
 roleRef:
   kind: ClusterRole
-  name: usage-report-role
+  name: ROLE_NAME-role
   apiGroup: rbac.authorization.k8s.io

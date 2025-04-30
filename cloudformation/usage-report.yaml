@@ -11,10 +11,6 @@ Parameters:
   UsageReportRoleName:
     Type: String
     Description: Name of the IAM role for usage reporting
-  AthenaDBName:
-    Type: String
-    Description: Name of S3 Athena database
-    Default: 'usage_report'
   DataRententionDays:
     Type: Number
     Description: Data rentention day for S3 Bucket
@@ -50,7 +46,9 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: !Sub "${AWS::AccountId}-${AWS::Region}-${HyperPodClusterId}-usage-report"
+      BucketName: !Sub 
+      - "${AWS::AccountId}-${AWS::Region}-${HyperPodClusterId}-usage-report-${Suffix}"
+      - Suffix: !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref AWS::StackId]]]]
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
@@ -74,8 +72,8 @@ Resources:
       PrincipalArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${UsageReportRoleName}'
       Type: STANDARD
       KubernetesGroups: 
-        - UsageReportRole
-      Username: UsageReportRole
+        - !Sub ${UsageReportRoleName}-Role
+      Username: !Sub ${UsageReportRoleName}-Role
   # Pod identity resources setup
   ServiceAccountRole:
     Type: 'AWS::IAM::Role'
@@ -121,16 +119,19 @@ Resources:
     Properties:
       CatalogId: !Ref AWS::AccountId
       DatabaseInput:
-        Name: !Ref AthenaDBName
         Description: 'Database for AWS Cluster usage report.'
 
   UsageReportAthenaWorkGroup:
     Type: AWS::Athena::WorkGroup
     Properties:
-      Name: "usage-report-workgroup"
+      Name: !Sub 
+      - "${AWS::AccountId}-${AWS::Region}-${HyperPodClusterId}-usage-report-${Suffix}"
+      - Suffix: !Select [0, !Split ["-", !Select [2, !Split ["/", !Ref AWS::StackId]]]]
       WorkGroupConfiguration:
         ResultConfiguration:
           OutputLocation: !Sub "s3://${UsageReportBucket}/athena-results"
+      RecursiveDeleteOption: true
+
   # ClusterQueue Table
   ClusterQueueTable:
     Type: AWS::Glue::Table
@@ -525,14 +526,14 @@ Resources:
 
             class QueryTemplates:
                 CRESCENDO_SUMMARY = """
-                  INSERT into ${AthenaDBName}.summary_report
+                  INSERT into "${UsageReportDatabase}".summary_report
                   WITH latest_version_resource_states AS (
                     SELECT * FROM (
                       SELECT *, ROW_NUMBER() OVER (
                           PARTITION BY instance_type, timestamp, namespace, team
                           ORDER BY CAST(resource_version AS bigint) DESC
                         ) AS row_num
-                      FROM ${AthenaDBName}.clusterqueue
+                      FROM "${UsageReportDatabase}".clusterqueue
                     ) ranked
                     WHERE row_num = 1 AND year = '{year}' AND month = '{month}' AND day = '{day}'
                   ),
@@ -611,14 +612,14 @@ Resources:
                 """
 
                 CRESCENDO_DETAILED = """
-                    Insert into ${AthenaDBName}.detailed_report
+                    Insert into "${UsageReportDatabase}".detailed_report
                     WITH latest_version_workload AS (
                       SELECT * FROM (
                         SELECT *, ROW_NUMBER() OVER (
                             PARTITION BY workload_name, timestamp, namespace, team, instance_type
                             ORDER BY CAST(resource_version AS bigint) DESC
                           ) AS row_num
-                        FROM ${AthenaDBName}.workload
+                        FROM "${UsageReportDatabase}".workload
                       ) ranked
                       WHERE row_num = 1
                     ),
@@ -707,7 +708,7 @@ Resources:
                 """
 
                 NON_CRESCENDO_SUMMARY = """
-                INSERT INTO ${AthenaDBName}.summary_report
+                INSERT INTO "${UsageReportDatabase}".summary_report
                 WITH latest_pod_state_changes AS (
                   SELECT *
                   FROM (
@@ -717,7 +718,7 @@ Resources:
                         PARTITION BY pod, timestamp, namespace, owner, instance_type
                         ORDER BY CAST(resource_version AS bigint) DESC
                       ) AS row_num
-                    FROM ${AthenaDBName}.pod
+                    FROM "${UsageReportDatabase}".pod
                   ) ranked
                   WHERE row_num = 1
                 ),
@@ -845,7 +846,7 @@ Resources:
                 """
 
                 NON_CRESCENDO_DETAILED = """
-                    INSERT INTO ${AthenaDBName}.detailed_report
+                    INSERT INTO "${UsageReportDatabase}".detailed_report
                     WITH latest_pod_state_changes AS (
                       SELECT *
                       FROM (
@@ -855,7 +856,7 @@ Resources:
                             PARTITION BY pod, timestamp, namespace, owner, instance_type
                             ORDER BY CAST(resource_version AS bigint) DESC
                           ) AS row_num
-                        FROM ${AthenaDBName}.pod
+                        FROM "${UsageReportDatabase}".pod
                       ) ranked
                       WHERE row_num = 1
                     ),
@@ -1035,7 +1036,7 @@ Resources:
                 def execute_query(self, query):
                     response = self.athena.start_query_execution(
                         QueryString=query,
-                        QueryExecutionContext={'Database': '${AthenaDBName}'},
+                        QueryExecutionContext={'Database': '${UsageReportDatabase}'},
                         ResultConfiguration={'OutputLocation': self.output_location}
                     )
                     status, query_status = self.wait_for_query_completion(response['QueryExecutionId'])

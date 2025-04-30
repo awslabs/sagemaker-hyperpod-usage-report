@@ -38,6 +38,7 @@ class ReportGenerator:
         database_name: str,
         report_type: str,
         output_location: str,
+        database_workgroup_name: str,
         format: str,
     ):
         self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
@@ -47,7 +48,8 @@ class ReportGenerator:
         self.output_location = output_location
         self.format = format
         self.cluster_name = cluster_name
-
+        self.database_workgroup_name = database_workgroup_name
+        
         self.generator = (
             CSVReportGenerator() if format.lower() == "csv" else PDFReportGenerator()
         )
@@ -60,7 +62,7 @@ class ReportGenerator:
                 self.start_date.strftime("%Y-%m-%d"),
                 self.end_date.strftime("%Y-%m-%d"),
             )
-            return wr.athena.read_sql_query(sql=query, database=self.database_name, workgroup='usage-report-workgroup')
+            return wr.athena.read_sql_query(sql=query, database=self.database_name, workgroup=self.database_workgroup_name)
         except Exception as e:
             print(f"Error fetching data: {str(e)}")
             raise
