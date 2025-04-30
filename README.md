@@ -46,13 +46,16 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
 * Set the following local environment variables in your terminal:
 
+  **Note**
+     -  To install the usage report, you need an *Installer* IAM role and with appropriate permissions. You can either create a new IAM role and leave the role policies blank for now, or reuse an existing role such as your current administrator role. Use the selected role name in the `USAGE_REPORT_INSTALLER_ROLE_NAME` variable. You will populate the role policies in the upcoming configuration steps.
+
     ```sh
     # Set up the environment variable
     export AWS_ACCOUNT=<account number>
     export AWS_REGION=<region>
     export HYPERPOD_CLUSTER_NAME=<hyperpod cluster name>
     export EKS_CLUSTER_NAME=<eks cluster name>
-    export USAGE_REPORT_INSTALLER_ROLE_NAME=<IAM role name used to install usage report, you can create a new role or reuse an existing one>
+    export USAGE_REPORT_INSTALLER_ROLE_NAME=<Installer IAM role name>
     export USAGE_REPORT_OPERATOR_NAME=sagemaker-usage-report <keep under 22 characters if custom>
     export HYPERPOD_CLUSTER_ID=$(aws sagemaker describe-cluster --cluster-name ml-cluster --region $AWS_REGION | jq -r '.ClusterArn | split("/")[-1]')
 
@@ -84,8 +87,8 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
         `arn:aws:eks:us-west-2:xxxxxxxxxxxx:cluster/hyperpod-eks-cluster`
 
-  * Attach the IAM policy to your installed role.
-    * Populate your IAM permissions JSON file from the template provided in `permissions/usage-report-installer-policy.json.template`
+  * Generate and attach the required IAM policies.
+    * Populate the IAM policy document for your *Installer* role from the template provided in `permissions/usage-report-installer-policy.json.template`.
       ```sh
       INPUT_FILE="permissions/usage-report-installer-policy.json.template"
       OUTPUT_FILE="permissions/usage-report-installer-policy.json"
@@ -98,7 +101,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
       -e "s/USAGE_REPORT_INSTALLER_ROLE_NAME/$USAGE_REPORT_INSTALLER_ROLE_NAME/g" \
       "$INPUT_FILE" > "$OUTPUT_FILE"
       ```
-    * Attach the `permissions/usage-report-installer-policy.json` IAM policy to the IAM installer role who performs AWS CLI and helm operations. This ensures usage report installer have the required permissions to install and manage SageMaker HyperPod Usage report data capture.
+    * Attach the `permissions/usage-report-installer-policy.json` IAM policy to the IAM *Installer* role that performs AWS CLI, kubectl, and helm operations. This ensures usage report installers have the required permissions to install and manage SageMaker HyperPod Usage report data capture.
 
       To embed the inline policy in an existing role, use the following command:
 
@@ -288,7 +291,7 @@ kubectl logs -n sagemaker-hyperpod-usage-report \
 $(kubectl get pods -n sagemaker-hyperpod-usage-report -o name \
 | grep "^pod/sagemaker-hyperpod-usage-report-" | sed -n '2p')
 ```
-After the verifcation you could start to submit jobs to the cluster and raw job usage data will be stored under `$USAGE_REPORT_S3_BUCKET/raw/`
+You can start submitting jobs to the cluster. Raw job usage data is stored in the S3 bucket path `$USAGE_REPORT_S3_BUCKET/raw/`.
 
 **Important**
 
@@ -370,7 +373,7 @@ For example, a summary report for the dates April 15, 2025, to April 17, 2025, i
 
 ### Overview
 
-When you no longer need your SageMaker HyperPod usage reporting infrastructure, use these steps to clean up AWS and Kubernetes resources. Proper resource deletion helps prevent unnecessary costs.
+When you no longer need your SageMaker HyperPod usage reporting infrastructure, follow these steps to clean up Kubernetes and AWS resources (in that order). Proper resource deletion helps prevent unnecessary costs.
 
 ### Delete the Kubernetes Resources
 To uninstall the Helm chart, run the following command:
@@ -402,7 +405,7 @@ aws cloudformation describe-stacks --region $AWS_REGION --stack-name $USAGE_REPO
 
 ## Local Development
 
-### Running Unit Tests
+### Run Unit Tests
 
 To run the unit tests locally:
 ```bash
@@ -415,7 +418,7 @@ This will execute all test cases in the test directory. The test suite includes 
  
 See [./attributions](./attributions) for credits.
 
-## Contributing
+## Contribute
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
 
