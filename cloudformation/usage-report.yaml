@@ -72,8 +72,8 @@ Resources:
       PrincipalArn: !Sub 'arn:aws:iam::${AWS::AccountId}:role/${UsageReportRoleName}'
       Type: STANDARD
       KubernetesGroups: 
-        - UsageReportRole
-      Username: UsageReportRole
+        - !Sub ${UsageReportRoleName}-Role
+      Username: !Sub ${UsageReportRoleName}-Role
   # Pod identity resources setup
   ServiceAccountRole:
     Type: 'AWS::IAM::Role'
@@ -130,6 +130,8 @@ Resources:
       WorkGroupConfiguration:
         ResultConfiguration:
           OutputLocation: !Sub "s3://${UsageReportBucket}/athena-results"
+      RecursiveDeleteOption: true
+
   # ClusterQueue Table
   ClusterQueueTable:
     Type: AWS::Glue::Table

@@ -9,7 +9,7 @@
                 "cloudformation:DescribeStacks",
                 "cloudformation:DescribeStackResources"
             ],
-            "Resource": "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT:stack/USAGE_REPORT_CFN_STACK_NAME/*"
+            "Resource": "arn:aws:cloudformation:AWS_REGION:AWS_ACCOUNT:stack/USAGE_REPORT_OPERATOR_NAME/*"
         },    
         {
             "Effect": "Allow",
@@ -65,12 +65,8 @@
             "Resource": [
                 "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:catalog",
                 "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:database/usagereportdatabase-*",
-                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/clusterqueue",
-                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/detailed_report",
-                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/heartdub",
-                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/pod",
-                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/summary_report",
-                "arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/workload"
+				"arn:aws:glue:AWS_REGION:AWS_ACCOUNT:table/usagereportdatabase-*/*",
+				"arn:aws:glue:AWS_REGION:AWS_ACCOUNT:userDefinedFunction/usagereportdatabase-*/*"
             ]
         },
 
@@ -99,7 +95,7 @@
                 "events:DescribeRule"
             ],
             "Resource": [
-                "arn:aws:events:AWS_REGION:AWS_ACCOUNT:rule/USAGE_REPORT_CFN_STACK_NAME-AggregationRule-*"
+                "arn:aws:events:AWS_REGION:AWS_ACCOUNT:rule/USAGE_REPORT_OPERATOR_NAME-AggregationRule-*"
             ]
         },
         {
@@ -114,7 +110,7 @@
                 "iam:DetachRolePolicy"
             ],
             "Resource": [
-                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-LambdaExecutionRole-*"
+                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_OPERATOR_NAME-LambdaExecutionRole-*"
             ]
         },
         {
@@ -129,7 +125,7 @@
                 "iam:ListPolicyVersions"
             ],
             "Resource": [
-                "arn:aws:iam::AWS_ACCOUNT:policy/USAGE_REPORT_CFN_STACK_NAME-LambdaExecutionRolePolicy-*"
+                "arn:aws:iam::AWS_ACCOUNT:policy/USAGE_REPORT_OPERATOR_NAME-LambdaExecutionRolePolicy-*"
             ]
         },
         {
@@ -141,7 +137,7 @@
                 "iam:PutRolePolicy",
                 "iam:DeleteRolePolicy"
             ],
-            "Resource": "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-ServiceAccountRole-*"
+            "Resource": "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_OPERATOR_NAME-ServiceAccountRole-*"
         },        
         {
             "Effect": "Allow",
@@ -149,8 +145,8 @@
                 "iam:PassRole"
             ],
             "Resource": [
-                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-LambdaExecutionRole-*",
-                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_CFN_STACK_NAME-ServiceAccountRole-*"
+                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_OPERATOR_NAME-LambdaExecutionRole-*",
+                "arn:aws:iam::AWS_ACCOUNT:role/USAGE_REPORT_OPERATOR_NAME-ServiceAccountRole-*"
             ]
         },
         {
@@ -166,7 +162,7 @@
                 "lambda:RemovePermission"
             ],
             "Resource": [
-                "arn:aws:lambda:AWS_REGION:AWS_ACCOUNT:function:USAGE_REPORT_CFN_STACK_NAME-AggregationLambda-*"
+                "arn:aws:lambda:AWS_REGION:AWS_ACCOUNT:function:USAGE_REPORT_OPERATOR_NAME-AggregationLambda-*"
             ]
         },
         {
