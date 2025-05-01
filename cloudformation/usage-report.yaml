@@ -705,7 +705,7 @@ Resources:
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * GPU) AS gpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * neuron_core) AS neuron_utilization_hours,
                             COUNT(DISTINCT workload_name) AS workload_count,
-                            COUNT_IF(CPU > 0) AS cpu_count, COUNT_IF(GPU > 0) AS gpu_count,COUNT_IF(neuron_core > 0) AS neuron_count,
+                            SUM(CPU) AS cpu_count, SUM(GPU) AS gpu_count, SUM(neuron_core) AS neuron_count,
                             year, month, day, cluster
                         FROM continuous_running_periods
                         GROUP BY 
@@ -1007,6 +1007,7 @@ Resources:
                     ),
                     team_grouped_utilization AS (
                         SELECT
+                            pod,
                             namespace,
                             task_name,
                             group_id,
@@ -1019,9 +1020,9 @@ Resources:
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * GPU) AS gpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * neuron_core) AS neuron_utilization_hours,
                             COUNT(DISTINCT pod) AS pod_count,
-                            COUNT_IF(CPU > 0) AS cpu_count,
-                            COUNT_IF(GPU > 0) AS gpu_count,
-                            COUNT_IF(neuron_core > 0) AS neuron_count,
+                            MAX(CPU) AS cpu_count,
+                            MAX(GPU) AS gpu_count,
+                            MAX(neuron_core) AS neuron_count,
                             priority_class,
                             year,
                             month,
@@ -1029,7 +1030,7 @@ Resources:
                             cluster
                         FROM continuous_running_periods
                         GROUP BY 
-                            namespace, task_name, group_id, instance_type, job_type,
+                            pod, namespace, task_name, group_id, instance_type, job_type,
                             priority_class, year, month, day, cluster
                     )
                     SELECT
