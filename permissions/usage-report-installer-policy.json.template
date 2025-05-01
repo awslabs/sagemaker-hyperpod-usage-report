@@ -25,7 +25,9 @@
                 "s3:GetBucketLocation",
                 "s3:ListBucket",
                 "s3:DeleteBucket",
-                "s3:DeleteObject"
+                "s3:DeleteObject",
+                "s3:ListBucketVersions",
+                "s3:DeleteObjectVersion"
             ],
             "Resource": [
                 "arn:aws:s3:::AWS_ACCOUNT-AWS_REGION-HYPERPOD_CLUSTER_ID-usage-report-*",
