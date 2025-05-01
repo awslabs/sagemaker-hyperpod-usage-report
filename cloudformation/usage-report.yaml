@@ -673,7 +673,7 @@ Resources:
                         SELECT
                             workload_name, group_id, MIN(period_start) AS period_start, MAX(period_end) AS period_end, namespace,
                             CASE 
-                                WHEN bool_or(finished) THEN 'Succeeded'
+                                WHEN bool_or(finished) THEN 'Finished'
                                 WHEN bool_or(next_status = 'Failed') OR bool_or(next_status IS NULL) THEN 'Failed'
                                 WHEN bool_or(status = 'QuotaReserved-True' AND next_status = 'Evicted-True') THEN 'Preempted'
                                 ELSE 'Running'
