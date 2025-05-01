@@ -634,15 +634,29 @@ Resources:
                     running_periods AS (
                         SELECT 
                             workload_name, timestamp as period_start,
-                            COALESCE(LEAD(timestamp) OVER(
-                                PARTITION BY workload_name, instance_type, year, month, day
-                                ORDER BY timestamp
-                            ), timestamp) as period_end,
+                            CASE 
+                              WHEN LEAD(timestamp) OVER(
+                                  PARTITION BY workload_name, instance_type, year, month, day
+                                  ORDER BY timestamp
+                              ) is NULL and status = 'QuotaReserved-True' 
+                              THEN DATE_ADD('DAY', 1, DATE_TRUNC('DAY', timestamp))
+                              ELSE COALESCE(LEAD(timestamp) OVER(
+                                      PARTITION BY workload_name, instance_type, year, month, day
+                                      ORDER BY timestamp
+                                  ), timestamp) 
+                            END as period_end,
                             namespace, status,
-                            LEAD(status) OVER(
-                                PARTITION BY workload_name, instance_type, year, month, day
-                                ORDER BY timestamp
-                            ) as next_status,
+                            CASE 
+                              WHEN LEAD(status) OVER(
+                                  PARTITION BY workload_name, instance_type, year, month, day
+                                  ORDER BY timestamp
+                              ) is NULL and status = 'QuotaReserved-True'
+                              THEN 'QuotaReserved-True'
+                              ELSE LEAD(status) OVER(
+                                  PARTITION BY workload_name, instance_type, year, month, day
+                                  ORDER BY timestamp
+                              )
+                            END as next_status,
                             team, instance_type, task_priority_class, CPU, GPU, neuron_core,
                             admitted, finished, year, month, day, cluster
                         FROM workload_state_changes
@@ -887,15 +901,32 @@ Resources:
                             namespace,
                             pod,
                             timestamp as period_start,
-                            COALESCE(LEAD(timestamp) OVER(
-                                PARTITION BY pod, instance_type, year, month, day
-                                ORDER BY timestamp
-                            ), timestamp) as period_end,
+                            CASE 
+                                WHEN LEAD(timestamp) OVER(
+                                    PARTITION BY pod, instance_type, year, month, day
+                                    ORDER BY timestamp
+                                ) is NULL and status = 'Running' 
+                                THEN DATE_ADD('DAY', 1, DATE_TRUNC('DAY', timestamp))
+                                ELSE COALESCE(
+                                    LEAD(timestamp) OVER(
+                                        PARTITION BY pod, instance_type, year, month, day
+                                        ORDER BY timestamp
+                                    ), 
+                                    timestamp
+                                ) 
+                              END as period_end,
                             status,
-                            LEAD(status) OVER(
-                                PARTITION BY pod, instance_type, year, month, day
-                                ORDER BY timestamp
-                            ) as next_status,
+                            CASE 
+                                WHEN LEAD(status) OVER(
+                                    PARTITION BY pod, instance_type, year, month, day
+                                    ORDER BY timestamp
+                                ) is NULL and status = 'Running'
+                                THEN 'Running'
+                                ELSE LEAD(status) OVER(
+                                    PARTITION BY pod, instance_type, year, month, day
+                                    ORDER BY timestamp
+                                )
+                            END as next_status,
                             task_name,
                             instance_type,
                             job_type,
