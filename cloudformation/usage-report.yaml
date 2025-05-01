@@ -739,20 +739,8 @@ Resources:
                 ),
                 pod_state_changes AS (
                     SELECT DISTINCT
-                        pod,
-                        timestamp,
-                        namespace,
-                        status,
-                        owner,
-                        instance_type,
-                        job_type,
-                        CPU,
-                        GPU,
-                        neuron_core,
-                        year,
-                        month,
-                        day,
-                        cluster
+                        pod, timestamp, namespace, status, owner, instance_type, job_type, CPU, GPU,
+                        neuron_core, year, month, day, cluster
                     FROM latest_pod_state_changes
                     WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     AND status != 'Unknown'
@@ -778,17 +766,7 @@ Resources:
                                 ORDER BY timestamp
                             )
                         END as period_end,
-                        status,
-                        instance_type,
-                        namespace,
-                        CPU,
-                        GPU,
-                        neuron_core,
-                        owner,
-                        year,
-                        month,
-                        day,
-                        cluster
+                        status, instance_type, namespace, CPU, GPU, neuron_core, owner, year, month, day, cluster
                     FROM pod_state_changes
                 ),
                 utilization_calc AS (
@@ -831,13 +809,7 @@ Resources:
                     FROM running_periods
                     GROUP BY 
                         DATE(period_start),
-                        namespace,
-                        instance_type,
-                        owner,
-                        year,
-                        month,
-                        day,
-                        cluster
+                        namespace, instance_type, owner, year, month, day, cluster
                 )
                 SELECT
                     report_date,
@@ -877,22 +849,8 @@ Resources:
                     ),
                     pod_state_changes AS (
                         SELECT DISTINCT
-                            namespace,
-                            pod,
-                            timestamp,
-                            status,
-                            owner as task_name,
-                            instance_type,
-                            job_type,
-                            assigned_node,
-                            CPU,
-                            GPU,
-                            neuron_core,
-                            priority_class,
-                            year,
-                            month,
-                            day,
-                            cluster
+                            namespace, pod, timestamp, status, owner as task_name, instance_type, job_type,
+                            assigned_node, CPU, GPU, neuron_core, priority_class, year, month, day, cluster
                         FROM latest_pod_state_changes
                         WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     ),
@@ -927,17 +885,8 @@ Resources:
                                     ORDER BY timestamp
                                 )
                             END as next_status,
-                            task_name,
-                            instance_type,
-                            job_type,
-                            CPU,
-                            GPU,
-                            neuron_core,
-                            priority_class,
-                            year,
-                            month,
-                            day,
-                            cluster
+                            task_name, instance_type, job_type, CPU, GPU, neuron_core, priority_class,
+                            year, month, day, cluster
                         FROM pod_state_changes
                     ), 
                     filtered_running_periods AS (
