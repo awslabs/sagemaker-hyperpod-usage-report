@@ -675,6 +675,7 @@ Resources:
                             CASE 
                                 WHEN bool_or(finished) THEN 'Succeeded'
                                 WHEN bool_or(next_status = 'Failed') OR bool_or(next_status IS NULL) THEN 'Failed'
+                                WHEN bool_or(status = 'QuotaReserved-True' AND next_status = 'Evicted-True') THEN 'Preempted'
                                 ELSE 'Running'
                             END AS status, team, instance_type, task_priority_class, CPU, GPU, neuron_core, year, month, day, cluster
                         FROM grouped_with_ids
@@ -942,6 +943,7 @@ Resources:
                             CASE 
                                 WHEN COUNT_IF(next_status = 'Succeeded') > 0 THEN 'Succeeded'
                                 WHEN COUNT_IF(next_status = 'Failed') > 0 or COUNT_IF(next_status is NULL) > 0 THEN 'Failed'
+                                WHEN bool_or(status = 'QuotaReserved-True' AND next_status = 'Evicted-True') THEN 'Preempted'
                                 ELSE 'Running'
                             END AS status,
                             task_name,
