@@ -21,7 +21,7 @@ reported the issue. Please try to include as much information as you can. Detail
 
 
 ## Contributing via Pull Requests
-Currently SageMaker HyperPod Usage Report doesn't open for public to submit pull requests. If you have any question, please submit issue and the service team will respond as soon as possible.
+Currently SageMaker HyperPod Usage Report doesn't open for public to submit pull requests. If you have any question, please submit Github issue and the service team will respond as soon as possible.
 
 ## Finding contributions to work on
 Looking at the existing issues is a great way to find something to contribute on. As our projects, by default, use the default GitHub issue labels (enhancement/bug/duplicate/help wanted/invalid/question/wontfix), looking at any 'help wanted' issues is a great place to start.
