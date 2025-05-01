@@ -13,6 +13,7 @@ def report_generator():
         end_date="2025-03-25",
         cluster_name="dummy-cluster",
         database_name="dummy-db",
+        database_workgroup_name='dummy-workgroup',
         report_type="summary",
         output_location="s3://dummy-bucket/reports",
         format="csv",
