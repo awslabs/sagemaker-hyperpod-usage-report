@@ -56,7 +56,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
     export HYPERPOD_CLUSTER_NAME=<hyperpod cluster name>
     export EKS_CLUSTER_NAME=<eks cluster name>
     export USAGE_REPORT_INSTALLER_ROLE_NAME=<Installer IAM role name>
-    export USAGE_REPORT_OPERATOR_NAME=sagemaker-usage-report <keep under 22 characters if custom>
+    export USAGE_REPORT_OPERATOR_NAME=hyperpod-usage-report <keep under 22 characters if custom>
     export HYPERPOD_CLUSTER_ID=$(aws sagemaker describe-cluster --cluster-name ml-cluster --region $AWS_REGION | jq -r '.ClusterArn | split("/")[-1]')
 
     aws configure set region $AWS_REGION
@@ -122,7 +122,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
 * Create a dedicated Kubernetes namespace for the usage report operator:
 
-   * In `sagemaker-hyperpod-usage-report`, run the following command to create the namespace `sagemaker-hyperpod-usage-report`: 
+   * In `sagemaker-hyperpod-usage-report`, run the following command to create the namespace `$USAGE_REPORT_OPERATOR_NAME`: 
 
       ```sh
       INPUT_FILE="permissions/usage-report-namespace.yaml.template"
@@ -166,7 +166,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
 You can find the CloudFormation template in the `/cloudformation` directory. The template provisions the following AWS resources:
 
-* **Storage infrastructure**: An S3 bucket (`s3://$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_CLUSTER_ID-usage-report`) to capture usage data, with associated IAM role allowing pods to write data to the bucket.
+* **Storage infrastructure**: An S3 bucket (`s3://$AWS_ACCOUNT-$AWS_REGION-$HYPERPOD_CLUSTER_ID-usage-report-<random string>`) to capture usage data, with associated IAM role allowing pods to write data to the bucket.
 * **Query infrastructure**: An Athena database for querying and aggregating usage data.
 * **Processing infrastructure**: An AWS Lambda function triggered daily by a CloudWatch Event rule to perform automated usage data aggregation and reporting.
 
@@ -179,7 +179,7 @@ You can find the CloudFormation template in the `/cloudformation` directory. The
 | UsageReportInstallerRoleName        | Yes      | -                                     | Name of the IAM role for usage reporting installation                                                    |
 | DataRententionDays         | No       | 180                                   | Data retention days for S3 Bucket                                                           |
 | InstallPodIdentityAddon    | No       | "true"                                | Whether to install the Pod Identity Addon. Allowed values: "true", "false"                  |
-| UsageReportOperatorNameSpace | No      | sagemaker-hyperpod-usage-report       | Kubernetes cluster namespace where usage report operator is installed                       |
+| UsageReportOperatorNameSpace | No      | hyperpod-usage-report       | Kubernetes cluster namespace where usage report operator is installed                       |
 | OperatorServiceAccount     | No       | sagemaker-hyperpod-usage-report-service-account | Service account used by usage report operator pod identity for permissions to access AWS resources |
 
 #### Deploy the Stack
@@ -241,7 +241,7 @@ aws cloudformation describe-stacks --stack-name $USAGE_REPORT_OPERATOR_NAME \
 
 #### Overview
 The `values.yaml` Helm chart in the `/helm_chart` directory configures the SageMaker HyperPod usage report Kubernetes operator, which provisions and manages the following cluster resources:
-* **Namespace**: `sagemaker-hyperpod-usage-report` (default)
+* **Namespace**: `hyperpod-usage-report` (default)
 * **Service Account**: `sagemaker-hyperpod-usage-report-service-account` (default)
 * **RBAC rules** granting the operator cluster-scoped permissions to:
   - Monitor cluster resources (clusterqueues, workloads, namespaces, pods)
@@ -255,7 +255,7 @@ You can configure the Helm chart by either updating the `values.yaml` file or by
 | Parameter             | Description                                                                                               | Default Value                             | Required | Notes                                                                                       |
 |-----------------------|-----------------------------------------------------------------------------------------------------------|-------------------------------------------|----------|---------------------------------------------------------------------------------------------|
 | replicaCount          | Number of operator replicas to run                                                                        | 2                                         | No       |                                                                                             |
-| namespace             | Namespace where the operator will be installed                                                            | "sagemaker-hyperpod-usage-report"         | No       | Can be modified to deploy in a different namespace                                          |
+| namespace             | Namespace where the operator will be installed                                                            | "hyperpod-usage-report"         | No       | Can be modified to deploy in a different namespace                                          |
 | serviceAccount.name   | Name of the service account                                                                               | "sagemaker-hyperpod-usage-report-service-account" | No       | Can be modified if using custom naming                                                      |
 | s3BucketName          | Name of the S3 bucket that was created from the cloudformation template                                   |                                           | Yes      | Operator will start storing the usage report data in this bucket.                           |
 | clusterName           | Name of the EKS Cluster                                                                                   |                                           | Yes      |                                                                                             |
@@ -287,13 +287,13 @@ helm install $USAGE_REPORT_OPERATOR_NAME \
 #### Verify the Operator Installation
 Verify the operator installation:
 ```sh
-kubectl get pods -n sagemaker-hyperpod-usage-report
+kubectl get pods -n $USAGE_REPORT_OPERATOR_NAME
 ```
 You can start submitting jobs to the cluster. Raw job usage data is stored in the S3 bucket path `$USAGE_REPORT_S3_BUCKET/raw/`.
 
-**Important**
-
-  When uninstalling the `sagemaker-hyperpod-usage-report` helm chart, the associated namespace is automatically deleted, which invalidates the RBAC permissions. You must restore the namespace-level RBAC configurations previously set in the cluster by re-running the steps in the prerequisites section.
+**Notes**
+- Before install the operator through helm chart, make sure the [HyperPod Usage Report cloudformation stack](hyperpod-usage-report-sagemaker-hyperpod-usage-report-696fkl4tl) is completed.
+- When uninstalling the `$USAGE_REPORT_OPERATOR_NAME` helm chart, the associated namespace is automatically deleted, which invalidates the RBAC permissions. You must restore the namespace-level RBAC configurations previously set in the cluster by re-running the steps in the prerequisites section.
 
 
 ## Generate Reports

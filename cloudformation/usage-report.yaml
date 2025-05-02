@@ -25,7 +25,7 @@ Parameters:
     Description: Kubernetes cluster namespace where usage report operator is installed 
     # The default namespace is the same as the operator namespace specified in helm chart 
     # https://github.com/awslabs/sagemaker-hyperpod-usage-report/blob/main/helm_chart/SageMakerHyperPodUsageReportChart/templates/_helpers.tpl
-    Default: "sagemaker-hyperpod-usage-report"
+    Default: "hyperpod-usage-report"
   OperatorServiceAccount:
     Type: String
     Description: Service account used by usage report operator pod identity for permissions to access AWS resources
