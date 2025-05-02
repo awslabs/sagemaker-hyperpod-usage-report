@@ -15,8 +15,8 @@ Usage reporting in SageMaker HyperPod EKS-orchestrated clusters provides visibil
     - [Prerequisites](#prerequisites)
     - [Install Usage Report Infrastructure using CloudFormation](#install-usage-report-infrastructure-using-cloudformation)
     - [Install Usage Report Kubernetes Operator using Helm](#install-usage-report-kubernetes-operator-using-helm)
-1. [Generate Reports](#generate-reports)
-1.[Clean Up Resources](#clean-up-resources)
+1. [Generate Reports](#generate-reports) 
+1. [Clean Up Resources](#clean-up-resources) 
 1. [Local Development](#local-development) 
 1. [Attributions and Open Source Acknowledgments](#attributions-and-open-source-acknowledgments)
 1. [Contributing](#contributing)
@@ -36,7 +36,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
 * Have AWS CLI, kubectl, and Helm (package manager for Kubernetes - version >= 3.17.1) installed.
 
-* A Python environment (version >= 3.10).
+* A Python environment (version >= 3.9).
 
 * Clone the GitHub repository sagemaker-hyperpod-usage-report.
 
@@ -85,7 +85,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
         kubectl config current-context 
         ```
 
-        `arn:aws:eks:us-west-2:xxxxxxxxxxxx:cluster/hyperpod-eks-cluster`
+        `arn:aws:eks:$AWS_REGION:$AWS_ACCOUNT:cluster/$EKS_CLUSTER_NAME`
 
   * Generate and attach the required IAM policies.
     * Populate the IAM policy document for your *Installer* role from the template provided in `permissions/usage-report-installer-policy.json.template`.
@@ -287,9 +287,7 @@ helm install $USAGE_REPORT_OPERATOR_NAME \
 #### Verify the Operator Installation
 Verify the operator installation:
 ```sh
-kubectl logs -n sagemaker-hyperpod-usage-report \
-$(kubectl get pods -n sagemaker-hyperpod-usage-report -o name \
-| grep "^pod/sagemaker-hyperpod-usage-report-" | sed -n '2p')
+kubectl get pods -n sagemaker-hyperpod-usage-report
 ```
 You can start submitting jobs to the cluster. Raw job usage data is stored in the S3 bucket path `$USAGE_REPORT_S3_BUCKET/raw/`.
 
@@ -354,7 +352,7 @@ python run.py \
 --database-name $USAGE_REPORT_DATABASE \
 --database-workgroup-name $DATABASE_WORKGROUP_NAME \
 --type <detailed or summary> \
---output-report-location s3://$USAGE_REPORT_S3_BUCKET/<usage_report_output/> \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/<usage report output folder> \
 --cluster-name $HYPERPOD_CLUSTER_NAME
 ```
 **Note**
@@ -384,7 +382,7 @@ helm uninstall $USAGE_REPORT_OPERATOR_NAME
 
 Ensure that you uninstalled the SageMaker HyperPod usage report Kubernetes operator:
 ```sh
-kubectl logs $(kubectl get pods -o name | grep "^pod/sagemaker-hyperpod-usage-report-" | head -n 1)
+kubectl get pods --namespace $USAGE_REPORT_OPERATOR_NAME
 ```
 
 ### Delete the AWS Resources
@@ -401,7 +399,6 @@ aws cloudformation describe-stacks --region $AWS_REGION --stack-name $USAGE_REPO
 
 **Note:** To prevent accidental deletion, you should delete the S3 buckets created by the CloudFormation stack manually:
 - `$USAGE_REPORT_S3_BUCKET`
-- `aws-athena-query-results-$AWS_ACCOUNT-$AWS_REGION`
 
 ## Local Development
 
