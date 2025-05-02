@@ -122,7 +122,7 @@ To successfully deploy and use the SageMaker HyperPod usage report, you should m
 
 * Create a dedicated Kubernetes namespace for the usage report operator:
 
-   * In `sagemaker-hyperpod-usage-report`, run the following command to create the namespace `sagemaker-hyperpod-usage-report`: 
+   * In `sagemaker-hyperpod-usage-report`, run the following command to create the namespace `$USAGE_REPORT_OPERATOR_NAME`: 
 
       ```sh
       INPUT_FILE="permissions/usage-report-namespace.yaml.template"
@@ -287,13 +287,13 @@ helm install $USAGE_REPORT_OPERATOR_NAME \
 #### Verify the Operator Installation
 Verify the operator installation:
 ```sh
-kubectl get pods -n sagemaker-hyperpod-usage-report
+kubectl get pods -n $USAGE_REPORT_OPERATOR_NAME
 ```
 You can start submitting jobs to the cluster. Raw job usage data is stored in the S3 bucket path `$USAGE_REPORT_S3_BUCKET/raw/`.
 
 **Important**
 
-  When uninstalling the `sagemaker-hyperpod-usage-report` helm chart, the associated namespace is automatically deleted, which invalidates the RBAC permissions. You must restore the namespace-level RBAC configurations previously set in the cluster by re-running the steps in the prerequisites section.
+  When uninstalling the `$USAGE_REPORT_OPERATOR_NAME` helm chart, the associated namespace is automatically deleted, which invalidates the RBAC permissions. You must restore the namespace-level RBAC configurations previously set in the cluster by re-running the steps in the prerequisites section.
 
 
 ## Generate Reports
