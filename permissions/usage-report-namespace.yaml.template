@@ -6,4 +6,4 @@ metadata:
     app.kubernetes.io/managed-by: Helm
   annotations:
     meta.helm.sh/release-name: NAMESPACE
-    meta.helm.sh/release-namespace: default
+    meta.helm.sh/release-namespace: NAMESPACE
