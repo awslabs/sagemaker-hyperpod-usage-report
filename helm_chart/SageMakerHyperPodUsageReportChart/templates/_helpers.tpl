@@ -9,7 +9,7 @@ Expand the name of the chart.
 Create the namespace name
 */}}
 {{- define "sagemaker-hyperpod-usage-report.namespace" -}}
-{{- .Values.namespace | default "hyperpod-usage-report" }}
+{{- .Release.Namespace | default "hyperpod-usage-report" }}
 {{- end }}
 
 {{/*

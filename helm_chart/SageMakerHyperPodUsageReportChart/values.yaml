@@ -27,7 +27,7 @@ fullnameOverride: ""
 serviceAccount:
   create: true
   annotations: {}
-  name: sagemaker-hyperpod-usage-report-service-account
+  name: hyperpod-usage-report
 
 rbac:
   create: true
