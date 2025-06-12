@@ -412,6 +412,72 @@ pytest
 ```
 This will execute all test cases in the test directory. The test suite includes unit tests for all major components of the usage report functionality.
 
+## Troubleshooting
+
+###  Empty Reports
+
+If your generated usage reports are empty, follow these diagnostic steps to identify and resolve the issue.
+
+### 1. Verify Data Capture in S3
+
+Check if raw data files exist in your S3 bucket:
+```bash
+aws s3 ls s3://$USAGE_REPORT_S3_BUCKET/raw/
+```
+If no files are present, proceed to verify the infrastructure components below.
+
+### 2. Validate CloudFormation Stack Status
+
+Check the status of cloudformation stack
+```bash
+aws cloudformation describe-stacks \
+    --stack-name $USAGE_REPORT_OPERATOR_NAME \
+    --query 'Stacks[0].StackStatus' \
+    --output text
+```
+
+If the stack status shows ROLLBACK_COMPLETE or any failure state, investigate the failure reason:
+```bash
+aws cloudformation describe-stack-events \
+    --stack-name $USAGE_REPORT_OPERATOR_NAME \
+    --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].[LogicalResourceId,ResourceStatusReason]'
+```
+
+#### Common failure scenarios:
+
+* S3 bucket name conflicts
+* Athena table conflicts
+
+If the stack failed, clean up existing resources and redeploy the cloudformation by following this [section](https://github.com/awslabs/sagemaker-hyperpod-usage-report?tab=readme-ov-file#set-up-usage-reporting).
+
+### 3. Verify Kubernetes Operator Status
+
+Connect to the Kubernetes Cluster
+```bash
+aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+```
+
+Check if the operator pods are running
+```bash
+kubectl get pods -n $USAGE_REPORT_OPERATOR_NAME
+```
+
+For non-running pods, examine the pod status:
+```bash
+kubectl describe pod <pod-name> -n $USAGE_REPORT_OPERATOR_NAME
+```
+
+Review operator logs for error messages
+```bash
+kubectl logs <pod-name> -n $USAGE_REPORT_OPERATOR_NAME
+```
+
+#### Common operator issues:
+* Resource constraints preventing pod scheduling.
+* Network connectivity issues to AWS S3 service. 
+
+If you encounter issues not covered above, please collect the above diagnostic information and create an [issue](https://github.com/awslabs/sagemaker-hyperpod-usage-report/issues).
+
 ## Attributions and Open Source Acknowledgments
  
 See [./attributions](./attributions) for credits.
