@@ -74,10 +74,48 @@ def test_generate_report_header(header_info):
     generator = CSVReportGenerator()
     expected_header = [
         "Amazon SageMaker HyperPod",
-        "ClusterName: test-cluster",
-        "Type: Summary Utilization Report",
-        "Date Generated: 2025-03-25",
-        "Date Range (UTC): 2025-03-25 to 2025-03-25",
+        "Cluster Name: test-cluster",
+        "Report Type: Summary Utilization Report",
+        "Report Date Generated: 2025-03-25",
+        "Report Date Range (UTC): 2025-03-25 to 2025-03-25",
+    ]
+
+    # Act
+    header = generator.generate_report_header(header_info)
+
+    # Assert
+    assert header == expected_header
+
+
+def test_generate_report_header_with_team(header_info):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = "test-namespace"
+    expected_header = [
+        "Amazon SageMaker HyperPod",
+        "Cluster Name: test-cluster",
+        "Report Type: Summary Utilization Report",
+        "Report Date Generated: 2025-03-25",
+        "Report Date Range (UTC): 2025-03-25 to 2025-03-25",
+    ]
+
+    # Act
+    header = generator.generate_report_header(header_info)
+
+    # Assert
+    assert header == expected_header
+
+
+def test_generate_report_header_with_empty_team(header_info):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = ""
+    expected_header = [
+        "Amazon SageMaker HyperPod",
+        "Cluster Name: test-cluster",
+        "Report Type: Summary Utilization Report",
+        "Report Date Generated: 2025-03-25",
+        "Report Date Range (UTC): 2025-03-25 to 2025-03-25",
     ]
 
     # Act
@@ -182,7 +220,7 @@ def test_summary_report_content(summary_df, header_info, empty_missing_periods):
 
     # Assert
     write_calls = [call.args[0] for call in mock_file().write.call_args_list]
-    assert any("ClusterName: test-cluster\n" in call for call in write_calls)
+    assert any("Cluster Name: test-cluster\n" in call for call in write_calls)
     assert any(
         "2025-03-25,test-namespace,test-team,t2.micro" in call for call in write_calls
     )
@@ -202,8 +240,222 @@ def test_detailed_report_content(detailed_df, header_info, empty_missing_periods
 
     # Assert
     write_calls = [call.args[0] for call in mock_file().write.call_args_list]
-    assert any("ClusterName: test-cluster\n" in call for call in write_calls)
+    assert any("Cluster Name: test-cluster\n" in call for call in write_calls)
     assert any(
         "2025-03-25,20:00:00,21:00:00,test-namespace,test-team,test-task" in call
         for call in write_calls
     )
+
+
+def test_summary_report_content_with_team(summary_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = "ml-team"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m) as mock_file:
+        generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    write_calls = [call.args[0] for call in mock_file().write.call_args_list]
+    assert any("Cluster Name: test-cluster\n" in call for call in write_calls)
+    assert any("Namespace: ml-team\n" in call for call in write_calls)
+    assert any(
+        "2025-03-25,test-namespace,test-team,t2.micro" in call for call in write_calls
+    )
+
+
+def test_detailed_report_content_with_team(detailed_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["report_type"] = "detailed"
+    header_info["namespace"] = "data-science"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m) as mock_file:
+        generator.generate_detailed_report(
+            detailed_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    write_calls = [call.args[0] for call in mock_file().write.call_args_list]
+    assert any("Cluster Name: test-cluster\n" in call for call in write_calls)
+    assert any("Namespace: data-science\n" in call for call in write_calls)
+    assert any(
+        "2025-03-25,20:00:00,21:00:00,test-namespace,test-team,test-task" in call
+        for call in write_calls
+    )
+
+
+def test_generate_report_header_with_none_team(header_info):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = None
+    expected_header = [
+        "Amazon SageMaker HyperPod",
+        "Cluster Name: test-cluster",
+        "Report Type: Summary Utilization Report",
+        "Report Date Generated: 2025-03-25",
+        "Report Date Range (UTC): 2025-03-25 to 2025-03-25",
+    ]
+
+    # Act
+    header = generator.generate_report_header(header_info)
+
+    # Assert
+    assert header == expected_header
+
+
+def test_generate_report_header_detailed_with_team(header_info):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["report_type"] = "detailed"
+    header_info["namespace"] = "analytics-team"
+    expected_header = [
+        "Amazon SageMaker HyperPod",
+        "Cluster Name: test-cluster",
+        "Report Type: Detailed Utilization Report",
+        "Report Date Generated: 2025-03-25",
+        "Report Date Range (UTC): 2025-03-25 to 2025-03-25",
+    ]
+
+    # Act
+    header = generator.generate_report_header(header_info)
+
+    # Assert
+    assert header == expected_header
+
+
+def test_summary_report_filename_with_team(summary_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = "ml-team-a"
+    expected_filename = "summary-report-2025-03-25-ml-team-a.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")
+
+
+def test_detailed_report_filename_with_team(detailed_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["report_type"] = "detailed"
+    header_info["namespace"] = "data-science"
+    expected_filename = "detailed-report-2025-03-25-data-science.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_detailed_report(
+            detailed_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")
+
+
+def test_summary_report_filename_without_team(summary_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    # No team specified
+    expected_filename = "summary-report-2025-03-25.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")
+
+
+def test_summary_report_filename_with_team_multiple_days(summary_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = "ml-team-a"
+    header_info["days"] = 7
+    header_info["end_date"] = "2025-03-31"
+    expected_filename = "summary-report-2025-03-25-2025-03-31-ml-team-a.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")
+
+
+def test_summary_report_filename_with_task(summary_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["task"] = "training-job-1"
+    expected_filename = "summary-report-2025-03-25-training-job-1.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")
+
+
+def test_detailed_report_filename_with_task(detailed_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["report_type"] = "detailed"
+    header_info["task"] = "inference-job-2"
+    expected_filename = "detailed-report-2025-03-25-inference-job-2.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_detailed_report(
+            detailed_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")
+
+
+def test_summary_report_filename_with_team_and_task(summary_df, header_info, empty_missing_periods):
+    # Arrange
+    generator = CSVReportGenerator()
+    header_info["namespace"] = "ml-team-a"
+    header_info["task"] = "training-job-1"
+    expected_filename = "summary-report-2025-03-25-ml-team-a-training-job-1.csv"
+    m = mock_open()
+
+    # Act
+    with patch("builtins.open", m):
+        output_file = generator.generate_summary_report(
+            summary_df, header_info, empty_missing_periods
+        )
+
+    # Assert
+    assert output_file == expected_filename
+    m.assert_called_once_with(expected_filename, "w")

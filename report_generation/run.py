@@ -39,6 +39,8 @@ def main():
         help="S3 location for output (s3://bucket/path)",
     )
     parser.add_argument("--cluster-name", required=True, help="Hyperpod Cluster Name")
+    parser.add_argument("--namespace", required=False, help="Filter report by namespace (optional)")
+    parser.add_argument("--task", required=False, help="Filter report by task name (optional)")
     
     args = parser.parse_args()
 
@@ -51,6 +53,8 @@ def main():
         report_type=args.type,
         output_location=args.output_report_location,
         format=args.format,
+        namespace=args.namespace,
+        task=args.task,
     )
 
     generator.generate_report()

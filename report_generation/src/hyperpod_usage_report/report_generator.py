@@ -40,6 +40,8 @@ class ReportGenerator:
         output_location: str,
         database_workgroup_name: str,
         format: str,
+        namespace: str = None,
+        task: str = None,
     ):
         self.start_date = datetime.strptime(start_date, "%Y-%m-%d")
         self.end_date = datetime.strptime(end_date, "%Y-%m-%d")
@@ -49,6 +51,8 @@ class ReportGenerator:
         self.format = format
         self.cluster_name = cluster_name
         self.database_workgroup_name = database_workgroup_name
+        self.namespace = namespace
+        self.task = task
         
         self.generator = (
             CSVReportGenerator() if format.lower() == "csv" else PDFReportGenerator()
@@ -61,6 +65,8 @@ class ReportGenerator:
                 self.report_type,
                 self.start_date.strftime("%Y-%m-%d"),
                 self.end_date.strftime("%Y-%m-%d"),
+                self.namespace,
+                self.task,
             )
             return wr.athena.read_sql_query(sql=query, database=self.database_name, workgroup=self.database_workgroup_name)
         except Exception as e:
@@ -69,7 +75,7 @@ class ReportGenerator:
 
     def _prepare_header_info(self) -> Dict[str, str]:
         """Prepares header information for the report"""
-        return {
+        base_header = {
             "cluster_name": self.cluster_name,
             "report_date": self.end_date.strftime("%Y-%m-%d"),
             "report_type": self.report_type,
@@ -77,6 +83,14 @@ class ReportGenerator:
             "end_date": self.end_date.strftime("%Y-%m-%d"),
             "days": str((self.end_date - self.start_date).days + 1),
         }
+        
+        if self.namespace:
+            base_header["namespace"] = self.namespace
+        
+        if self.task:
+            base_header["task"] = self.task
+        
+        return base_header
 
     def _generate_report_by_type(
         self,

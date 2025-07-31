@@ -10,22 +10,32 @@ class CSVReportGenerator(BaseReportGenerator):
 
         return [
             "Amazon SageMaker HyperPod",
-            f"ClusterName: {header_info['cluster_name']}",
-            f"Type: {header_info['report_type'].title()} Utilization Report",
-            f"Date Generated: {header_info['report_date']}",
-            f"Date Range (UTC): {time_period}",
+            f"Cluster Name: {header_info['cluster_name']}",
+            f"Report Type: {header_info['report_type'].title()} Utilization Report",
+            f"Report Date Generated: {header_info['report_date']}",
+            f"Report Date Range (UTC): {time_period}",
         ]
+        
+    def generate_filter_lines(self, header_info: dict) -> list:
+        """Generate filter information lines"""
+        filter_fields = {
+            "namespace": "Namespace",
+            "task": "Task"
+        }
+        
+        filter_lines = [
+            f"{display_name}: {header_info[field]}"
+            for field, display_name in filter_fields.items()
+            if header_info.get(field)
+        ]
+        
+        return filter_lines
 
     def generate_summary_report(
         self, df: pd.DataFrame, header_info: dict, missing_periods: list
     ) -> str:
         """Generate CSV Summary report"""
-        base_name = f"{header_info['report_type']}-report-{header_info['start_date']}"
-        output_file = (
-            f"{base_name}-{header_info['end_date']}.csv"
-            if int(header_info["days"]) > 1
-            else f"{base_name}.csv"
-        )
+        output_file = self._build_filename(header_info, self.CSV_EXTENSION)
 
         # Column headers (multi-level)
         resource_headers = [
@@ -56,35 +66,45 @@ class CSVReportGenerator(BaseReportGenerator):
 
         # Write to file
         with open(output_file, "w") as f:
+            # Write base header
             for row in self.generate_report_header(header_info):
                 f.write(f"{row}\n")
 
+            # Write filter lines
+            for row in self.generate_filter_lines(header_info):
+                f.write(f"{row}\n")
+
+            # Write missing periods (moved to after filters)
             if missing_periods != []:
                 f.write(f"Missing data periods\n")
                 for period in missing_periods:
                     f.write(f"{period['start_time']} to {period['end_time']}\n")
 
+            # Write column headers
             for header_row in resource_headers:
                 f.write(f"{header_row}\n")
 
-            # Write data
-            for _, row in df.iterrows():
-                formatted_row = [
-                    row["report_date"].strftime("%Y-%m-%d"),
-                    row["namespace"],
-                    row["team"],
-                    row["instance_type"],
-                    f"{row['total_neuron_core_utilization_hours']:.2f}",
-                    f"{row['allocated_neuron_core_utilization_hours']:.2f}",
-                    f"{row['borrowed_neuron_core_utilization_hours']:.2f}",
-                    f"{row['total_gpu_utilization_hours']:.2f}",
-                    f"{row['allocated_gpu_utilization_hours']:.2f}",
-                    f"{row['borrowed_gpu_utilization_hours']:.2f}",
-                    f"{row['total_vcpu_utilization_hours']:.2f}",
-                    f"{row['allocated_vcpu_utilization_hours']:.2f}",
-                    f"{row['borrowed_vcpu_utilization_hours']:.2f}",
-                ]
-                f.write(",".join(formatted_row) + "\n")
+            if df.empty:
+                f.write("No Results\n")
+            else:
+                # Write data
+                for _, row in df.iterrows():
+                    formatted_row = [
+                        row["report_date"].strftime("%Y-%m-%d"),
+                        row["namespace"],
+                        row["team"],
+                        row["instance_type"],
+                        f"{row['total_neuron_core_utilization_hours']:.2f}",
+                        f"{row['allocated_neuron_core_utilization_hours']:.2f}",
+                        f"{row['borrowed_neuron_core_utilization_hours']:.2f}",
+                        f"{row['total_gpu_utilization_hours']:.2f}",
+                        f"{row['allocated_gpu_utilization_hours']:.2f}",
+                        f"{row['borrowed_gpu_utilization_hours']:.2f}",
+                        f"{row['total_vcpu_utilization_hours']:.2f}",
+                        f"{row['allocated_vcpu_utilization_hours']:.2f}",
+                        f"{row['borrowed_vcpu_utilization_hours']:.2f}",
+                    ]
+                    f.write(",".join(formatted_row) + "\n")
 
         return output_file
 
@@ -92,12 +112,7 @@ class CSVReportGenerator(BaseReportGenerator):
         self, df: pd.DataFrame, header_info: dict, missing_periods: list
     ) -> str:
         """Generate CSV Detailed report"""
-        base_name = f"{header_info['report_type']}-report-{header_info['start_date']}"
-        output_file = (
-            f"{base_name}-{header_info['end_date']}.csv"
-            if int(header_info["days"]) > 1
-            else f"{base_name}.csv"
-        )
+        output_file = self._build_filename(header_info, self.CSV_EXTENSION)
 
         # Column headers (multi-level)
         resource_headers = [
@@ -130,36 +145,46 @@ class CSVReportGenerator(BaseReportGenerator):
 
         # Write to file
         with open(output_file, "w") as f:
+            # Write base header
             for row in self.generate_report_header(header_info):
                 f.write(f"{row}\n")
 
+            # Write filter lines
+            for row in self.generate_filter_lines(header_info):
+                f.write(f"{row}\n")
+
+            # Write missing periods
             if missing_periods != []:
-                f.write(f"Missing data periods\n")
+                f.write(f"Missing Data Periods\n")
                 for period in missing_periods:
                     f.write(f"{period['start_time']} to {period['end_time']}\n")
 
+            # Write column headers
             for header_row in resource_headers:
                 f.write(f"{header_row}\n")
 
-            # Write data
-            for _, row in df.iterrows():
-                formatted_row = [
-                    row["report_date"].strftime("%Y-%m-%d"),
-                    row["period_start"].strftime("%H:%M:%S"),
-                    row["period_end"].strftime("%H:%M:%S"),
-                    row["namespace"],
-                    row["team"],
-                    row["task_name"],
-                    row["instance"],
-                    row["status"],
-                    f"{row['utilized_neuron_core_hours']:.2f}",
-                    f"{row['utilized_neuron_core_count']:.2f}",
-                    f"{row['utilized_gpu_hours']:.2f}",
-                    f"{row['utilized_gpu_count']:.2f}",
-                    f"{row['utilized_vcpu_hours']:.2f}",
-                    f"{row['utilized_vcpu_count']:.2f}",
-                    row["priority_class"],
-                ]
-                f.write(",".join(formatted_row) + "\n")
+            if df.empty:
+                f.write("No Results\n")
+            else:
+                # Write data
+                for _, row in df.iterrows():
+                    formatted_row = [
+                        row["report_date"].strftime("%Y-%m-%d"),
+                        row["period_start"].strftime("%H:%M:%S"),
+                        row["period_end"].strftime("%H:%M:%S"),
+                        row["namespace"],
+                        row["team"],
+                        row["task_name"],
+                        row["instance"],
+                        row["status"],
+                        f"{row['utilized_neuron_core_hours']:.2f}",
+                        f"{row['utilized_neuron_core_count']:.2f}",
+                        f"{row['utilized_gpu_hours']:.2f}",
+                        f"{row['utilized_gpu_count']:.2f}",
+                        f"{row['utilized_vcpu_hours']:.2f}",
+                        f"{row['utilized_vcpu_count']:.2f}",
+                        row["priority_class"],
+                    ]
+                    f.write(",".join(formatted_row) + "\n")
 
         return output_file
