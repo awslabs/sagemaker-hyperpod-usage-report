@@ -134,15 +134,15 @@ class PDFReportGenerator(BaseReportGenerator):
         # Draw the border
         pdf.rect(x_start, y_start, width, height)
 
-    def _add_report_header(
-        self, pdf: FPDF, header_info: Dict[str, Any], missing_periods: list
+    def _add_base_header(
+        self, pdf: FPDF, header_info: Dict[str, Any]
     ) -> None:
-        """Add report header with title and metadata"""
+        """Add base report header with title and metadata"""
         # Title
         pdf.set_font(*PDFStyle.TITLE_FONT)
         pdf.cell(0, 10, f"Amazon SageMaker HyperPod", ln=True, align="C")
         pdf.cell(
-            0, 10, f"ClusterName: {header_info['cluster_name']}", ln=True, align="C"
+            0, 10, f"Cluster Name: {header_info['cluster_name']}", ln=True, align="C"
         )
         pdf.ln(5)
 
@@ -153,18 +153,88 @@ class PDFReportGenerator(BaseReportGenerator):
         # Report metadata
         pdf.set_font(*PDFStyle.HEADER_FONT)
         metadata_lines = [
-            f"Type: {header_info['report_type'].title()} Utilization Report",
-            f"Date Generated: {header_info['report_date']}",
-            f"Date Range (UTC): {header_info['start_date']} to {header_info['end_date']}",
+            f"Report Type: {header_info['report_type'].title()} Utilization Report",
+            f"Report Date Generated: {header_info['report_date']}",
+            f"Report Date Range (UTC): {header_info['start_date']} to {header_info['end_date']}",
         ]
-        if missing_periods != []:
-            metadata_lines.append(f"Missing data periods")
-            for period in missing_periods:
-                metadata_lines.append(f"{period['start_time']} to {period['end_time']}")
+        
         for line in metadata_lines:
-            pdf.cell(0, 10, line, ln=True, align="C")
-        pdf.ln(5)
+            pdf.cell(0, 10, line, ln=True, align="L")
 
+    def _add_missing_periods(
+        self, pdf: FPDF, missing_periods: list
+    ) -> None:
+        """Add missing periods information as comma-separated with smart wrapping"""
+        if missing_periods != []:
+            pdf.set_font(*PDFStyle.HEADER_FONT)
+            
+            # Build periods list
+            periods_list = []
+            for period in missing_periods:
+                periods_list.append(f"{period['start_time']} to {period['end_time']}")
+            
+            # Smart wrapping logic
+            header_text = "Missing Data Periods: "
+            max_line_length = 200  # Character limit per line for PDF
+            
+            # Start with header
+            current_line = header_text
+            lines = []
+            
+            for i, period in enumerate(periods_list):
+                # Add comma and space if not the first period
+                prefix = ", " if i > 0 else ""
+                period_text = prefix + period
+                
+                # Check if adding this period would exceed line limit
+                if len(current_line + period_text) > max_line_length:
+                    # Current line is full, start a new line
+                    lines.append(current_line)
+                    current_line = "    " + period  # Indent continuation lines
+                else:
+                    # Add to current line
+                    current_line += period_text
+            
+            # Add the last line
+            if current_line:
+                lines.append(current_line)
+            
+            # Write all lines to PDF
+            for line in lines:
+                pdf.cell(0, 10, line, ln=True, align="L")
+
+    def _add_filter_info(
+        self, pdf: FPDF, header_info: Dict[str, Any], namespace: str = None
+    ) -> None:
+        """Add filter information (namespace and task)"""
+        filter_lines = []
+        
+        if namespace:
+            filter_lines.append(f"Namespace: {namespace}")
+        elif header_info.get('namespace'):
+            filter_lines.append(f"Namespace: {header_info['namespace']}")
+        
+        if header_info.get('task'):
+            filter_lines.append(f"Task: {header_info['task']}")
+        
+        if filter_lines:
+            pdf.set_font(*PDFStyle.HEADER_FONT)
+            for line in filter_lines:
+                pdf.cell(0, 10, line, ln=True, align="L")
+
+    def _add_report_header(
+        self, pdf: FPDF, header_info: Dict[str, Any], missing_periods: list, namespace: str = None
+    ) -> None:
+        """Add complete report header with proper ordering"""
+        # Add base header
+        self._add_base_header(pdf, header_info)
+        
+        # Add filter information
+        self._add_filter_info(pdf, header_info, namespace)
+        
+        # Add missing periods (moved to after filters)
+        self._add_missing_periods(pdf, missing_periods)
+        
         # Second separator
         pdf.cell(0, 1, "", "B", ln=True)
         pdf.ln(5)
@@ -221,15 +291,6 @@ class PDFReportGenerator(BaseReportGenerator):
                 pdf.cell(col.width, 10, formatted_value, 1)
             pdf.ln()
 
-    def _get_output_filename(self, header_info: Dict[str, Any]) -> str:
-        """Generate output filename based on report parameters"""
-        base_name = f"{header_info['report_type']}-report-{header_info['start_date']}"
-        return (
-            f"{base_name}-{header_info['end_date']}.pdf"
-            if int(header_info["days"]) > 1
-            else f"{base_name}.pdf"
-        )
-
     def _generate_report(
         self,
         df: pd.DataFrame,
@@ -240,11 +301,38 @@ class PDFReportGenerator(BaseReportGenerator):
         missing_periods: list,
     ) -> str:
         """Generate a PDF report with the specified format"""
-        output_file = self._get_output_filename(header_info)
+        output_file = self._build_filename(header_info, self.PDF_EXTENSION)
         pdf = self._create_pdf()
-        self._add_report_header(pdf, header_info, missing_periods)
-        self._add_table_headers(pdf, columns, headers, is_detailed)
-        self._add_table_content(pdf, df, columns)
+        
+        # Check if there's data to display
+        if df.empty:
+            self._add_report_header(pdf, header_info, missing_periods)
+            self._add_table_headers(pdf, columns, headers, is_detailed)
+            pdf.set_font(*PDFStyle.HEADER_FONT)
+            pdf.cell(0, 20, "No Results", ln=True, align="C")
+        else:
+            if 'namespace' in df.columns:
+                # Group by namespace and create separate pages
+                namespaces = df['namespace'].unique()
+                for i, namespace in enumerate(namespaces):
+                    if i > 0:
+                        pdf.add_page()
+                    
+                    namespace_data = df[df['namespace'] == namespace]
+                    
+                    if header_info.get('namespace'):
+                        if i == 0:
+                            self._add_report_header(pdf, header_info, missing_periods)
+                    else:
+                        self._add_report_header(pdf, header_info, missing_periods, namespace)
+                    
+                    self._add_table_headers(pdf, columns, headers, is_detailed)
+                    self._add_table_content(pdf, namespace_data, columns)
+            else:
+                self._add_report_header(pdf, header_info, missing_periods)
+                self._add_table_headers(pdf, columns, headers, is_detailed)
+                self._add_table_content(pdf, df, columns)
+        
         pdf.output(output_file)
         return output_file
 

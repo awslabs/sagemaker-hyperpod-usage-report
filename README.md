@@ -337,12 +337,17 @@ To generate a usage report and export it to a specified S3 bucket, provide the f
 | --database-workgroup-name       | Name of Athena's workgroup          | `usage_report_workgroup`   | Yes      |
 | --type                | Type of report to generate             | `detailed` or `summary`        | Yes      |
 | --output-report-location | Directory where report will be saved | `s3://bucket-name/path` | Yes      |
-| --cluster-name        | Name of the HyperPod cluster           | `my-hyperpod-cluster` | Yes      |
+| `--cluster-name` | Name of the HyperPod cluster | `my-hyperpod-cluster` | Yes |
+| `--namespace` | Filter report by namespace (optional) | `ml-namespace-a` | No |
+| `--task` | Filter report by task name (optional) | `training-job-1` | No |
 
-**Note:** 
+**Note:**
 - Select a date range that falls within the previous 180 days from the current date (unless you customized the `DataRententionDays` when installing the CloudFormation stack).
 
 - A good practice is to create a separate folder in your S3 bucket to serve as the destination for generated usage reports.
+
+- The `--namespace` parameter allows you to filter reports to show only data for a specific namespace. If not specified, the report will include data for all namespaces.
+- The `--task` parameter allows you to filter reports to show only data for a specific task. If not specified, the report will include data for all tasks.
 
 Use the following command to generate and export the report:
 ```sh
@@ -354,18 +359,98 @@ python run.py \
 --database-workgroup-name $DATABASE_WORKGROUP_NAME \
 --type <detailed or summary> \
 --output-report-location s3://$USAGE_REPORT_S3_BUCKET/<usage report output folder> \
---cluster-name $HYPERPOD_CLUSTER_NAME
+--cluster-name $HYPERPOD_CLUSTER_NAME \
+--namespace <namespace, optional> \
+--task <task name, optional>
 ```
 **Note**
 * Ensure that the S3 bucket specified in `--output-report-location` has the necessary permissions to accept the report files.
 * The `cluster-name` should match the name of your SageMaker HyperPod cluster.
-* You can find all original captured data in the `raw` directory of your S3 bucket `$USAGE_REPORT_S3_BUCKET/raw` or in the Athena console.</para>
+* You can find all original captured data in the `raw` directory of your S3 bucket `$USAGE_REPORT_S3_BUCKET/raw` or in the Athena console.
+
+### Usage Examples
+
+#### Generate a report for all namespaces (default behavior)
+```sh
+python run.py \
+--start-date 2025-04-15 \
+--end-date 2025-04-17 \
+--format csv \
+--database-name $USAGE_REPORT_DATABASE \
+--database-workgroup-name $DATABASE_WORKGROUP_NAME \
+--type summary \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/reports/ \
+--cluster-name $HYPERPOD_CLUSTER_NAME
+```
+
+#### Generate a report filtered by namespace
+```sh
+python run.py \
+--start-date 2025-04-15 \
+--end-date 2025-04-17 \
+--format pdf \
+--database-name $USAGE_REPORT_DATABASE \
+--database-workgroup-name $DATABASE_WORKGROUP_NAME \
+--type detailed \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/reports/ \
+--cluster-name $HYPERPOD_CLUSTER_NAME \
+--namespace ml-namespace-a
+```
+
+#### Generate a summary report for a specific namespace
+```sh
+python run.py \
+--start-date 2025-04-15 \
+--end-date 2025-04-17 \
+--format csv \
+--database-name $USAGE_REPORT_DATABASE \
+--database-workgroup-name $DATABASE_WORKGROUP_NAME \
+--type summary \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/reports/ \
+--cluster-name $HYPERPOD_CLUSTER_NAME \
+--namespace data-science-namespace
+```
+
+#### Generate a report for a specific task
+```sh
+python run.py \
+--start-date 2025-04-15 \
+--end-date 2025-04-17 \
+--format csv \
+--database-name $USAGE_REPORT_DATABASE \
+--database-workgroup-name $DATABASE_WORKGROUP_NAME \
+--type summary \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/reports/ \
+--cluster-name $HYPERPOD_CLUSTER_NAME \
+--task training-job-1
+```
+
+#### Generate a report for a specific namespace and task
+```sh
+python run.py \
+--start-date 2025-04-15 \
+--end-date 2025-04-17 \
+--format pdf \
+--database-name $USAGE_REPORT_DATABASE \
+--database-workgroup-name $DATABASE_WORKGROUP_NAME \
+--type detailed \
+--output-report-location s3://$USAGE_REPORT_S3_BUCKET/reports/ \
+--cluster-name $HYPERPOD_CLUSTER_NAME \
+--namespace ml-namespace-a \
+--task inference-job-2
+```
 
 
 ### Output File Naming Convention
 The output file follows the naming convention: `<report-type>-report-<start-date>-<end-date>.<format>`.
 
-For example, a summary report for the dates April 15, 2025, to April 17, 2025, in CSV format will be named `summary-report-2025-04-15-2025-04-17.csv` and will be located in the specified output directory `--output-report-location` of your S3 bucket.
+When filters are applied, the filename includes the filter names after the date range: `<report-type>-report-<start-date>-<end-date>-<namespace>-<task>.<format>`.
+
+**Examples:**
+- Summary report for all namespaces: `summary-report-2025-04-15-2025-04-17.csv`
+- Summary report for ML Namespace A: `summary-report-2025-04-15-2025-04-17-ml-namespace-a.csv`
+- Detailed report for Data Science Namespace: `detailed-report-2025-04-15-2025-04-17-data-science-namespace.pdf`
+- Report for specific namespace and task: `summary-report-2025-04-15-2025-04-17-ml-namespace-a-training-job-1.csv`
 
 
 ## Clean Up Resources

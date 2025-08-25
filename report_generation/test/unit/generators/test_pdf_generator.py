@@ -99,17 +99,17 @@ def test_column_config_initialization():
     assert generator.detailed_columns[0].name == "report_date"
 
 
-def test_get_output_filename(header_info):
+def test_build_filename(header_info):
     generator = PDFReportGenerator()
 
     # Test single day
-    filename = generator._get_output_filename(header_info)
+    filename = generator._build_filename(header_info, "pdf")
     assert filename == "summary-report-2025-03-25.pdf"
 
     # Test multiple days
     header_info["days"] = 7
     header_info["end_date"] = "2025-03-31"
-    filename = generator._get_output_filename(header_info)
+    filename = generator._build_filename(header_info, "pdf")
     assert filename == "summary-report-2025-03-25-2025-03-31.pdf"
 
 
@@ -232,3 +232,93 @@ def test_pdf_style_constants():
     assert PDFStyle.HEADER_BG_COLOR == (0, 0, 0)
     assert PDFStyle.HEADER_TEXT_COLOR == (255, 255, 255)
     assert PDFStyle.SUBHEADER_BG_COLOR == (200, 200, 200)
+
+
+def test_add_report_header_with_team(mock_pdf, header_info, empty_missing_periods):
+    generator = PDFReportGenerator()
+    header_info["namespace"] = "ml-team"
+    
+    generator._add_report_header(mock_pdf, header_info, empty_missing_periods)
+
+    assert mock_pdf.set_font.called
+    assert mock_pdf.cell.called
+    calls = mock_pdf.cell.call_args_list
+    assert any("test-cluster" in str(call) for call in calls)
+    assert any("ml-team" in str(call) for call in calls)
+
+
+def test_add_report_header_without_team(mock_pdf, header_info, empty_missing_periods):
+    generator = PDFReportGenerator()
+    
+    generator._add_report_header(mock_pdf, header_info, empty_missing_periods)
+
+    assert mock_pdf.set_font.called
+    assert mock_pdf.cell.called
+    calls = mock_pdf.cell.call_args_list
+    assert any("test-cluster" in str(call) for call in calls)
+    # Should not contain team information
+    assert not any("Team:" in str(call) for call in calls)
+
+
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
+def test_generate_summary_report_with_team(mock_fpdf, summary_df, header_info, empty_missing_periods):
+    generator = PDFReportGenerator()
+    header_info["namespace"] = "analytics-team"
+    
+    output_file = generator.generate_summary_report(
+        summary_df, header_info, empty_missing_periods
+    )
+
+    assert output_file == "summary-report-2025-03-25-analytics-team.pdf"
+    mock_fpdf.return_value.output.assert_called_once_with(output_file)
+
+
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
+def test_generate_detailed_report_with_team(mock_fpdf, detailed_df, header_info, empty_missing_periods):
+    generator = PDFReportGenerator()
+    header_info["report_type"] = "detailed"
+    header_info["namespace"] = "data-science"
+    
+    output_file = generator.generate_detailed_report(
+        detailed_df, header_info, empty_missing_periods
+    )
+
+    assert output_file == "detailed-report-2025-03-25-data-science.pdf"
+    mock_fpdf.return_value.output.assert_called_once_with(output_file)
+
+
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
+def test_generate_report_with_multiple_teams(mock_fpdf, header_info, empty_missing_periods):
+    """Test report generation with multiple namespaces for page breaks"""
+    generator = PDFReportGenerator()
+    header_info["report_type"] = "summary"
+
+    # Create test data with multiple namespaces
+    from datetime import datetime
+    data = {
+        "report_date": [datetime.strptime("2025-03-25", "%Y-%m-%d")] * 3,
+        "namespace": ["namespace-a", "namespace-b", "namespace-c"],
+        "team": ["ml-team-a", "ml-team-b", "ml-team-c"],
+        "instance_type": ["ml.g5.xlarge", "ml.g5.xlarge", "ml.g5.xlarge"],
+        "total_neuron_core_utilization_hours": [10.5, 15.2, 8.7],
+        "allocated_neuron_core_utilization_hours": [8.0, 12.0, 6.5],
+        "borrowed_neuron_core_utilization_hours": [2.5, 3.2, 2.2],
+        "total_gpu_utilization_hours": [8.0, 12.0, 6.5],
+        "allocated_gpu_utilization_hours": [6.0, 9.0, 5.0],
+        "borrowed_gpu_utilization_hours": [2.0, 3.0, 1.5],
+        "total_vcpu_utilization_hours": [12.0, 18.0, 10.0],
+        "allocated_vcpu_utilization_hours": [10.0, 15.0, 8.0],
+        "borrowed_vcpu_utilization_hours": [2.0, 3.0, 2.0],
+    }
+    df = pd.DataFrame(data)
+
+    output_file = generator.generate_summary_report(df, header_info, empty_missing_periods)
+
+    # Should generate a file without namespace suffix since no namespace filter was applied
+    assert output_file.endswith(".pdf")
+    assert "namespace" not in output_file
+
+    # Verify that add_page was called for additional namespaces (3 namespaces = 2 page breaks)
+    mock_fpdf.return_value.add_page.assert_called()
+    # Should be called 3 times total: 1 initial from _create_pdf + 2 for page breaks (namespaces 2 and 3)
+    assert mock_fpdf.return_value.add_page.call_count == 3
