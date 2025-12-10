@@ -175,6 +175,10 @@ Resources:
               Type: double
             - Name: neuron_core_borrowed
               Type: double
+            - Name: mig_total
+              Type: string
+            - Name: mig_borrowed
+              Type: string
         PartitionKeys:
             - Name: year
               Type: string
@@ -234,6 +238,8 @@ Resources:
               Type: boolean
             - Name: finished
               Type: boolean
+            - Name: mig_resources
+              Type: string
         PartitionKeys:
             - Name: year
               Type: string
@@ -292,6 +298,8 @@ Resources:
             - Name: neuron_core
               Type: double
             - Name: priority_class
+              Type: string
+            - Name: mig_resources
               Type: string
         PartitionKeys:
             - Name: year
@@ -358,6 +366,12 @@ Resources:
               Type: double
             - Name: priority_class
               Type: string
+            - Name: mig_profile
+              Type: string
+            - Name: utilized_mig_hours
+              Type: double
+            - Name: utilized_mig_count
+              Type: double
         PartitionKeys:
             - Name: year
               Type: string
@@ -414,6 +428,14 @@ Resources:
             - Name: allocated_vcpu_utilization_hours
               Type: double
             - Name: borrowed_vcpu_utilization_hours
+              Type: double
+            - Name: mig_profile
+              Type: string
+            - Name: total_mig_utilization_hours
+              Type: double
+            - Name: allocated_mig_utilization_hours
+              Type: double
+            - Name: borrowed_mig_utilization_hours
               Type: double
         PartitionKeys:
             - Name: year
@@ -537,32 +559,61 @@ Resources:
                     ) ranked
                     WHERE row_num = 1 AND year = '{year}' AND month = '{month}' AND day = '{day}'
                   ),
+                  mig_expanded AS (
+                    SELECT 
+                      instance_type, timestamp, namespace, team, resource_version, cluster, year, month, day,
+                      gpu_total, gpu_borrowed, cpu_total, cpu_borrowed, neuron_core_total, neuron_core_borrowed,
+                      mig_profile,
+                      CAST(mig_total_count AS DOUBLE) as mig_total_count,
+                      CAST(mig_borrowed_count AS DOUBLE) as mig_borrowed_count,
+                      ROW_NUMBER() OVER (PARTITION BY instance_type, timestamp, namespace, team ORDER BY mig_profile) as mig_row_num
+                    FROM latest_version_resource_states
+                    CROSS JOIN UNNEST(
+                      COALESCE(map_keys(CAST(json_parse(mig_total) AS MAP(varchar, double))), ARRAY[NULL]),
+                      COALESCE(map_values(CAST(json_parse(mig_total) AS MAP(varchar, double))), ARRAY[NULL]),
+                      COALESCE(map_values(CAST(json_parse(mig_borrowed) AS MAP(varchar, double))), ARRAY[NULL])
+                    ) AS t(mig_profile, mig_total_count, mig_borrowed_count)
+                  ),
+                  latest_with_mig AS (
+                    SELECT
+                      namespace, team, instance_type, timestamp, resource_version, cluster, year, month, day,
+                      CASE WHEN mig_row_num = 1 THEN gpu_total ELSE 0 END as gpu_total,
+                      CASE WHEN mig_row_num = 1 THEN gpu_borrowed ELSE 0 END as gpu_borrowed,
+                      CASE WHEN mig_row_num = 1 THEN cpu_total ELSE 0 END as cpu_total,
+                      CASE WHEN mig_row_num = 1 THEN cpu_borrowed ELSE 0 END as cpu_borrowed,
+                      CASE WHEN mig_row_num = 1 THEN neuron_core_total ELSE 0 END as neuron_core_total,
+                      CASE WHEN mig_row_num = 1 THEN neuron_core_borrowed ELSE 0 END as neuron_core_borrowed,
+                      mig_profile,
+                      COALESCE(mig_total_count, 0) as mig_total,
+                      COALESCE(mig_borrowed_count, 0) as mig_borrowed
+                    FROM mig_expanded
+                  ),
                   resource_periods AS (
                       SELECT DISTINCT
                           CASE
-                              WHEN ROW_NUMBER() OVER (PARTITION BY namespace, team, instance_type, year, month, day ORDER BY timestamp) = 1
-                                  AND (gpu_total > 0 OR cpu_total > 0 OR neuron_core_total > 0)
+                              WHEN ROW_NUMBER() OVER (PARTITION BY namespace, team, instance_type, mig_profile, year, month, day ORDER BY timestamp) = 1
+                                  AND (gpu_total > 0 OR cpu_total > 0 OR neuron_core_total > 0 OR mig_total > 0)
                               THEN DATE_TRUNC('DAY', timestamp)
                               ELSE timestamp
                           END as period_start,
                           CASE
                               WHEN LEAD(timestamp) OVER(
-                                  PARTITION BY namespace, team, instance_type, year, month, day
+                                  PARTITION BY namespace, team, instance_type, mig_profile, year, month, day
                                   ORDER BY timestamp
                               ) IS NULL 
                               THEN DATE_ADD('DAY', 1, DATE_TRUNC('DAY', timestamp))
                               ELSE LEAD(timestamp) OVER(
-                                  PARTITION BY namespace, team, instance_type, year, month, day
+                                  PARTITION BY namespace, team, instance_type, mig_profile, year, month, day
                                   ORDER BY timestamp
                               )
                           END as period_end, namespace, team, instance_type, gpu_total, gpu_borrowed,
-                          cpu_total, cpu_borrowed, neuron_core_total, neuron_core_borrowed, cluster
-                      FROM latest_version_resource_states
+                          cpu_total, cpu_borrowed, neuron_core_total, neuron_core_borrowed, mig_profile, mig_total, mig_borrowed, cluster
+                      FROM latest_with_mig
                   ),
                   consolidated_periods AS (
                       SELECT 
-                          DATE(period_start) as report_date, namespace, team, instance_type, gpu_total, gpu_borrowed,
-                          cpu_total, cpu_borrowed, neuron_core_total, neuron_core_borrowed, period_start, period_end,
+                          DATE(period_start) as report_date, namespace, team, instance_type, mig_profile, gpu_total, gpu_borrowed,
+                          cpu_total, cpu_borrowed, neuron_core_total, neuron_core_borrowed, mig_total, mig_borrowed, period_start, period_end,
                           -- Calculate utilization hours for each resource type
                           (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * gpu_total as total_gpu_hours,
                           (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * (gpu_total - gpu_borrowed) as allocated_gpu_hours,
@@ -573,12 +624,15 @@ Resources:
                           (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * neuron_core_total as total_neuron_hours,
                           (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * (neuron_core_total - neuron_core_borrowed) as allocated_neuron_hours,
                           (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * neuron_core_borrowed as borrowed_neuron_hours,
+                          (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * mig_total as total_mig_hours,
+                          (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * (mig_total - mig_borrowed) as allocated_mig_hours,
+                          (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * mig_borrowed as borrowed_mig_hours,
                           cluster
                       FROM resource_periods
                       WHERE period_end IS NOT NULL
                   ),
                   daily_summary AS (
-                      SELECT report_date, namespace, team, instance_type,
+                      SELECT DISTINCT report_date, namespace, team, instance_type, mig_profile,
                           SUM(total_neuron_hours) as total_neuron_core_utilization_hours,
                           SUM(allocated_neuron_hours) as allocated_neuron_core_utilization_hours,
                           SUM(borrowed_neuron_hours) as borrowed_neuron_core_utilization_hours,
@@ -588,13 +642,16 @@ Resources:
                           SUM(total_cpu_hours) as total_vcpu_utilization_hours,
                           SUM(allocated_cpu_hours) as allocated_vcpu_utilization_hours,
                           SUM(borrowed_cpu_hours) as borrowed_vcpu_utilization_hours,
+                          SUM(total_mig_hours) as total_mig_utilization_hours,
+                          SUM(allocated_mig_hours) as allocated_mig_utilization_hours,
+                          SUM(borrowed_mig_hours) as borrowed_mig_utilization_hours,
                           CAST(YEAR(report_date) AS VARCHAR) as year,
                           LPAD(CAST(MONTH(report_date) AS VARCHAR), 2, '0') as month,
                           LPAD(CAST(DAY(report_date) AS VARCHAR), 2, '0') as day,
                           cluster
                       FROM consolidated_periods
                       GROUP BY 
-                          report_date, namespace, team, instance_type, cluster
+                          report_date, namespace, team, instance_type, mig_profile, cluster
                   )
                   SELECT
                       report_date, namespace, team, instance_type,
@@ -607,6 +664,10 @@ Resources:
                       total_vcpu_utilization_hours,
                       allocated_vcpu_utilization_hours,
                       borrowed_vcpu_utilization_hours,
+                      mig_profile,
+                      total_mig_utilization_hours,
+                      allocated_mig_utilization_hours,
+                      borrowed_mig_utilization_hours,
                       year, month, day, cluster
                   FROM daily_summary;
                 """
@@ -623,11 +684,29 @@ Resources:
                       ) ranked
                       WHERE row_num = 1
                     ),
+                    mig_expanded AS (
+                        SELECT 
+                          workload_name, timestamp, namespace, team, resource_version, status, task_priority_class, instance_type,
+                          CPU, GPU, neuron_core, admitted, finished, cluster, year, month, day,
+                          mig_profile,
+                          CAST(mig_count AS DOUBLE) as mig_count,
+                          ROW_NUMBER() OVER (PARTITION BY workload_name, timestamp, namespace, team, instance_type ORDER BY mig_profile) as mig_row_num
+                        FROM latest_version_workload
+                        CROSS JOIN UNNEST(
+                          COALESCE(map_keys(CAST(json_parse(mig_resources) AS MAP(varchar, double))), ARRAY[NULL]),
+                          COALESCE(map_values(CAST(json_parse(mig_resources) AS MAP(varchar, double))), ARRAY[NULL])
+                        ) AS t(mig_profile, mig_count)
+                    ),
                     workload_state_changes AS (
                         SELECT DISTINCT
                             workload_name, timestamp, namespace, team, status, instance_type, task_priority_class,
-                            CPU, GPU, neuron_core, admitted, finished, year, month, day, cluster
-                        FROM latest_version_workload
+                            CASE WHEN mig_row_num = 1 THEN CPU ELSE 0 END as CPU,
+                            CASE WHEN mig_row_num = 1 THEN GPU ELSE 0 END as GPU,
+                            CASE WHEN mig_row_num = 1 THEN neuron_core ELSE 0 END as neuron_core,
+                            mig_profile,
+                            COALESCE(mig_count, 0) as mig_count,
+                            admitted, finished, year, month, day, cluster
+                        FROM mig_expanded
                         WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     ),
 
@@ -636,34 +715,34 @@ Resources:
                             workload_name, timestamp as period_start,
                             CASE 
                               WHEN LEAD(timestamp) OVER(
-                                  PARTITION BY workload_name, instance_type, year, month, day
+                                  PARTITION BY workload_name, instance_type, mig_profile, year, month, day
                                   ORDER BY timestamp
                               ) is NULL and status = 'QuotaReserved-True' 
                               THEN DATE_ADD('DAY', 1, DATE_TRUNC('DAY', timestamp))
                               ELSE COALESCE(LEAD(timestamp) OVER(
-                                      PARTITION BY workload_name, instance_type, year, month, day
+                                      PARTITION BY workload_name, instance_type, mig_profile, year, month, day
                                       ORDER BY timestamp
                                   ), timestamp) 
                             END as period_end,
                             namespace, status,
                             CASE 
                               WHEN LEAD(status) OVER(
-                                  PARTITION BY workload_name, instance_type, year, month, day
+                                  PARTITION BY workload_name, instance_type, mig_profile, year, month, day
                                   ORDER BY timestamp
                               ) is NULL and status = 'QuotaReserved-True'
                               THEN 'QuotaReserved-True'
                               ELSE LEAD(status) OVER(
-                                  PARTITION BY workload_name, instance_type, year, month, day
+                                  PARTITION BY workload_name, instance_type, mig_profile, year, month, day
                                   ORDER BY timestamp
                               )
                             END as next_status,
-                            team, instance_type, task_priority_class, CPU, GPU, neuron_core,
+                            team, instance_type, task_priority_class, CPU, GPU, neuron_core, mig_profile, mig_count,
                             admitted, finished, year, month, day, cluster
                         FROM workload_state_changes
                     ),
 
                     filtered_running_periods AS (
-                        SELECT *, LAG(period_end) OVER (PARTITION BY workload_name, instance_type ORDER BY period_start) AS prev_period_end
+                        SELECT *, LAG(period_end) OVER (PARTITION BY workload_name, instance_type, mig_profile ORDER BY period_start) AS prev_period_end
                         FROM running_periods
                         WHERE admitted = true
                     ),
@@ -679,7 +758,7 @@ Resources:
                     ),
 
                     grouped_with_ids AS (
-                        SELECT *, SUM(is_new_group) OVER (PARTITION BY workload_name, instance_type ORDER BY period_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS group_id
+                        SELECT *, SUM(is_new_group) OVER (PARTITION BY workload_name, instance_type, mig_profile ORDER BY period_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS group_id
                         FROM running_grouped
                     ),
 
@@ -691,32 +770,34 @@ Resources:
                                 WHEN bool_or(next_status = 'Failed') OR bool_or(next_status IS NULL) THEN 'Failed'
                                 WHEN bool_or(status = 'QuotaReserved-True' AND next_status = 'Evicted-True') THEN 'Preempted'
                                 ELSE 'Running'
-                            END AS status, team, instance_type, task_priority_class, CPU, GPU, neuron_core, year, month, day, cluster
+                            END AS status, team, instance_type, task_priority_class, CPU, GPU, neuron_core, mig_profile, mig_count, year, month, day, cluster
                         FROM grouped_with_ids
                         GROUP BY 
-                          workload_name, group_id, namespace, team, instance_type, task_priority_class, CPU, GPU, neuron_core, 
+                          workload_name, group_id, namespace, team, instance_type, task_priority_class, CPU, GPU, neuron_core, mig_profile, mig_count,
                           year, month, day, cluster
                     ),
                     team_grouped_utilization AS (
                         SELECT
-                            workload_name, group_id, namespace, team, instance_type, task_priority_class,
+                            workload_name, group_id, namespace, team, instance_type, task_priority_class, mig_profile,
                             MIN(period_start) AS period_start, MAX(period_end) AS period_end, MAX(status) AS status,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * CPU) AS cpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * GPU) AS gpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * neuron_core) AS neuron_utilization_hours,
+                            SUM(date_diff('second', period_start, period_end) / 3600.0 * mig_count) AS mig_utilization_hours,
                             COUNT(DISTINCT workload_name) AS workload_count,
-                            SUM(CPU) AS cpu_count, SUM(GPU) AS gpu_count, SUM(neuron_core) AS neuron_count,
+                            SUM(CPU) AS cpu_count, SUM(GPU) AS gpu_count, SUM(neuron_core) AS neuron_count, SUM(mig_count) AS mig_count_total,
                             year, month, day, cluster
                         FROM continuous_running_periods
                         GROUP BY 
-                            workload_name, group_id, namespace, team, instance_type, task_priority_class,
+                            workload_name, group_id, namespace, team, instance_type, task_priority_class, mig_profile,
                             year, month, day, cluster
                     )
                     SELECT DATE(period_start) as report_date, period_start, period_end, namespace, team, workload_name as task_name,
                         instance_type as instance, workload_count as instance_count, status, neuron_utilization_hours as utilized_neuron_core_hours, 
                         CAST(neuron_count as double) as utilized_neuron_core_count, gpu_utilization_hours as utilized_gpu_hours, 
                         CAST(gpu_count as double) as utilized_gpu_count, cpu_utilization_hours as utilized_vcpu_hours, 
-                        CAST(cpu_count as double) as utilized_vcpu_count, task_priority_class as priority_class, 
+                        CAST(cpu_count as double) as utilized_vcpu_count, task_priority_class as priority_class,
+                        mig_profile, mig_utilization_hours as utilized_mig_hours, CAST(mig_count_total as double) as utilized_mig_count,
                         year, month, day, cluster
                     FROM team_grouped_utilization
                     ORDER BY report_date, task_name, instance;
@@ -737,11 +818,29 @@ Resources:
                   ) ranked
                   WHERE row_num = 1
                 ),
+                mig_expanded AS (
+                    SELECT 
+                      pod, timestamp, namespace, status, owner, instance_type, job_type, priority_class,
+                      CPU, GPU, neuron_core, cluster, year, month, day,
+                      mig_profile,
+                      CAST(mig_count AS DOUBLE) as mig_count,
+                      ROW_NUMBER() OVER (PARTITION BY pod, timestamp, namespace, owner, instance_type ORDER BY mig_profile) as mig_row_num
+                    FROM latest_pod_state_changes
+                    CROSS JOIN UNNEST(
+                      COALESCE(map_keys(CAST(json_parse(mig_resources) AS MAP(varchar, double))), ARRAY[NULL]),
+                      COALESCE(map_values(CAST(json_parse(mig_resources) AS MAP(varchar, double))), ARRAY[NULL])
+                    ) AS t(mig_profile, mig_count)
+                ),
                 pod_state_changes AS (
                     SELECT DISTINCT
-                        pod, timestamp, namespace, status, owner, instance_type, job_type, CPU, GPU,
-                        neuron_core, year, month, day, cluster
-                    FROM latest_pod_state_changes
+                        pod, timestamp, namespace, status, owner, instance_type, job_type,
+                        CASE WHEN mig_row_num = 1 THEN CPU ELSE 0 END as CPU,
+                        CASE WHEN mig_row_num = 1 THEN GPU ELSE 0 END as GPU,
+                        CASE WHEN mig_row_num = 1 THEN neuron_core ELSE 0 END as neuron_core,
+                        mig_profile,
+                        COALESCE(mig_count, 0) as mig_count,
+                        year, month, day, cluster
+                    FROM mig_expanded
                     WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     AND status != 'Unknown'
                 ),
@@ -749,24 +848,24 @@ Resources:
                     SELECT 
                         pod,
                         CASE
-                            WHEN ROW_NUMBER() OVER (PARTITION BY pod, year, month, day ORDER BY timestamp) = 1
+                            WHEN ROW_NUMBER() OVER (PARTITION BY pod, mig_profile, year, month, day ORDER BY timestamp) = 1
                                 AND status = 'Running'
                             THEN DATE_TRUNC('DAY', timestamp)
                             ELSE timestamp
                         END as period_start,
                         CASE
                             WHEN LEAD(timestamp) OVER(
-                                PARTITION BY pod, instance_type, year, month, day
+                                PARTITION BY pod, instance_type, mig_profile, year, month, day
                                 ORDER BY timestamp
                             ) IS NULL 
                             AND status = 'Running'
                             THEN DATE_ADD('DAY', 1, DATE_TRUNC('DAY', timestamp))
                             ELSE LEAD(timestamp) OVER(
-                                PARTITION BY pod, instance_type, year, month, day
+                                PARTITION BY pod, instance_type, mig_profile, year, month, day
                                 ORDER BY timestamp
                             )
                         END as period_end,
-                        status, instance_type, namespace, CPU, GPU, neuron_core, owner, year, month, day, cluster
+                        status, instance_type, namespace, CPU, GPU, neuron_core, mig_profile, mig_count, owner, year, month, day, cluster
                     FROM pod_state_changes
                 ),
                 utilization_calc AS (
@@ -775,6 +874,7 @@ Resources:
                         namespace,
                         '' as team,
                         instance_type,
+                        mig_profile,
                         SUM(
                             CASE 
                                 WHEN status = 'Running' AND period_end IS NOT NULL 
@@ -802,6 +902,15 @@ Resources:
                         ) as total_vcpu_utilization_hours,
                         0.0 as allocated_vcpu_utilization_hours,
                         0.0 as borrowed_vcpu_utilization_hours,
+                        SUM(
+                            CASE 
+                                WHEN status = 'Running' AND period_end IS NOT NULL 
+                                THEN (CAST(DATE_DIFF('second', period_start, period_end) AS DOUBLE) / 3600) * mig_count
+                                ELSE 0 
+                            END
+                        ) as total_mig_utilization_hours,
+                        0.0 as allocated_mig_utilization_hours,
+                        0.0 as borrowed_mig_utilization_hours,
                         CAST(YEAR(DATE(period_start)) AS VARCHAR) as year,
                         LPAD(CAST(MONTH(DATE(period_start)) AS VARCHAR), 2, '0') as month,
                         LPAD(CAST(DAY(DATE(period_start)) AS VARCHAR), 2, '0') as day,
@@ -809,7 +918,7 @@ Resources:
                     FROM running_periods
                     GROUP BY 
                         DATE(period_start),
-                        namespace, instance_type, owner, year, month, day, cluster
+                        namespace, instance_type, mig_profile, owner, year, month, day, cluster
                 )
                 SELECT
                     report_date,
@@ -825,6 +934,10 @@ Resources:
                     total_vcpu_utilization_hours,
                     allocated_vcpu_utilization_hours,
                     borrowed_vcpu_utilization_hours,
+                    mig_profile,
+                    total_mig_utilization_hours,
+                    allocated_mig_utilization_hours,
+                    borrowed_mig_utilization_hours,
                     year,
                     month,
                     day,
@@ -847,11 +960,30 @@ Resources:
                       ) ranked
                       WHERE row_num = 1
                     ),
+                    mig_expanded AS (
+                        SELECT 
+                          pod, timestamp, namespace, status, owner, instance_type, job_type, assigned_node, priority_class,
+                          CPU, GPU, neuron_core, cluster, year, month, day,
+                          mig_profile,
+                          CAST(mig_count AS DOUBLE) as mig_count,
+                          ROW_NUMBER() OVER (PARTITION BY pod, timestamp, namespace, owner, instance_type ORDER BY mig_profile) as mig_row_num
+                        FROM latest_pod_state_changes
+                        CROSS JOIN UNNEST(
+                          COALESCE(map_keys(CAST(json_parse(mig_resources) AS MAP(varchar, double))), ARRAY[NULL]),
+                          COALESCE(map_values(CAST(json_parse(mig_resources) AS MAP(varchar, double))), ARRAY[NULL])
+                        ) AS t(mig_profile, mig_count)
+                    ),
                     pod_state_changes AS (
                         SELECT DISTINCT
                             namespace, pod, timestamp, status, owner as task_name, instance_type, job_type,
-                            assigned_node, CPU, GPU, neuron_core, priority_class, year, month, day, cluster
-                        FROM latest_pod_state_changes
+                            assigned_node,
+                            CASE WHEN mig_row_num = 1 THEN CPU ELSE 0 END as CPU,
+                            CASE WHEN mig_row_num = 1 THEN GPU ELSE 0 END as GPU,
+                            CASE WHEN mig_row_num = 1 THEN neuron_core ELSE 0 END as neuron_core,
+                            mig_profile,
+                            COALESCE(mig_count, 0) as mig_count,
+                            priority_class, year, month, day, cluster
+                        FROM mig_expanded
                         WHERE year = '{year}' AND month = '{month}' AND day = '{day}'
                     ),
                     running_periods AS (
@@ -861,13 +993,13 @@ Resources:
                             timestamp as period_start,
                             CASE 
                                 WHEN LEAD(timestamp) OVER(
-                                    PARTITION BY pod, instance_type, year, month, day
+                                    PARTITION BY pod, instance_type, mig_profile, year, month, day
                                     ORDER BY timestamp
                                 ) is NULL and status = 'Running' 
                                 THEN DATE_ADD('DAY', 1, DATE_TRUNC('DAY', timestamp))
                                 ELSE COALESCE(
                                     LEAD(timestamp) OVER(
-                                        PARTITION BY pod, instance_type, year, month, day
+                                        PARTITION BY pod, instance_type, mig_profile, year, month, day
                                         ORDER BY timestamp
                                     ), 
                                     timestamp
@@ -876,23 +1008,23 @@ Resources:
                             status,
                             CASE 
                                 WHEN LEAD(status) OVER(
-                                    PARTITION BY pod, instance_type, year, month, day
+                                    PARTITION BY pod, instance_type, mig_profile, year, month, day
                                     ORDER BY timestamp
                                 ) is NULL and status = 'Running'
                                 THEN 'Running'
                                 ELSE LEAD(status) OVER(
-                                    PARTITION BY pod, instance_type, year, month, day
+                                    PARTITION BY pod, instance_type, mig_profile, year, month, day
                                     ORDER BY timestamp
                                 )
                             END as next_status,
-                            task_name, instance_type, job_type, CPU, GPU, neuron_core, priority_class,
+                            task_name, instance_type, job_type, CPU, GPU, neuron_core, mig_profile, mig_count, priority_class,
                             year, month, day, cluster
                         FROM pod_state_changes
                     ), 
                     filtered_running_periods AS (
                         SELECT 
                             *,
-                            LAG(period_end) OVER (PARTITION BY pod ORDER BY period_start) AS prev_period_end
+                            LAG(period_end) OVER (PARTITION BY pod, mig_profile ORDER BY period_start) AS prev_period_end
                         FROM running_periods
                         WHERE status = 'Running'
                     ),
@@ -909,7 +1041,7 @@ Resources:
 
                     grouped_with_ids AS (
                         SELECT *,
-                            SUM(is_new_group) OVER (PARTITION BY pod ORDER BY period_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS group_id
+                            SUM(is_new_group) OVER (PARTITION BY pod, mig_profile ORDER BY period_start ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS group_id
                         FROM running_grouped
                     ),
 
@@ -932,6 +1064,8 @@ Resources:
                             CPU,
                             GPU,
                             neuron_core,
+                            mig_profile,
+                            mig_count,
                             priority_class,
                             year,
                             month,
@@ -948,6 +1082,8 @@ Resources:
                             CPU,
                             GPU,
                             neuron_core,
+                            mig_profile,
+                            mig_count,
                             priority_class,
                             year,
                             month,
@@ -962,16 +1098,19 @@ Resources:
                             group_id,
                             instance_type,
                             job_type,
+                            mig_profile,
                             MIN(period_start) AS period_start,
                             MAX(period_end) AS period_end,
                             MAX(status) AS status,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * CPU) AS cpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * GPU) AS gpu_utilization_hours,
                             SUM(date_diff('second', period_start, period_end) / 3600.0 * neuron_core) AS neuron_utilization_hours,
+                            SUM(date_diff('second', period_start, period_end) / 3600.0 * mig_count) AS mig_utilization_hours,
                             COUNT(DISTINCT pod) AS pod_count,
                             MAX(CPU) AS cpu_count,
                             MAX(GPU) AS gpu_count,
                             MAX(neuron_core) AS neuron_count,
+                            MAX(mig_count) AS mig_count_total,
                             priority_class,
                             year,
                             month,
@@ -979,7 +1118,7 @@ Resources:
                             cluster
                         FROM continuous_running_periods
                         GROUP BY 
-                            pod, namespace, task_name, group_id, instance_type, job_type,
+                            pod, namespace, task_name, group_id, instance_type, job_type, mig_profile,
                             priority_class, year, month, day, cluster
                     )
                     SELECT
@@ -991,7 +1130,11 @@ Resources:
                         CAST(gpu_count as double) as utilized_gpu_count,
                         cpu_utilization_hours as utilized_vcpu_hours,
                         CAST(cpu_count as double) as utilized_vcpu_count,
-                        priority_class, year, month, day, cluster
+                        priority_class,
+                        mig_profile,
+                        mig_utilization_hours as utilized_mig_hours,
+                        CAST(mig_count_total as double) as utilized_mig_count,
+                        year, month, day, cluster
                     FROM team_grouped_utilization
                     ORDER BY report_date, task_name, instance;
                 """
