@@ -505,6 +505,9 @@ Resources:
           Resource:
           - '*'
   AggregationLambda:
+    DependsOn:
+      - LambdaExecutionRole
+      - LambdaExecutionRolePolicy
     Type: AWS::Lambda::Function
     Properties:
       Role: !GetAtt LambdaExecutionRole.Arn
