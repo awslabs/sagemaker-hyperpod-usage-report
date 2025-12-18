@@ -466,6 +466,7 @@ Resources:
         - Arn: !GetAtt AggregationLambda.Arn
           Id: "AthenaAggregationTarget"
   LambdaExecutionRole:
+    DependsOn: ServiceAccountRole
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
