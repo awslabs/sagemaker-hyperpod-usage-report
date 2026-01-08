@@ -466,11 +466,10 @@ Resources:
         - Arn: !GetAtt AggregationLambda.Arn
           Id: "AthenaAggregationTarget"
   LambdaExecutionRole:
-    DependsOn: ServiceAccountRole
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
-        Version: 2012-10-17
+        Version: '2012-10-17'
         Statement:
           - Effect: Allow
             Principal:
@@ -479,7 +478,23 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
         - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
-        - !Ref LambdaExecutionRolePolicy
+      Policies:
+        - PolicyName: LambdaS3AthenaAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 's3:GetObject'
+                  - 's3:PutObject'
+                Resource:
+                  - !Sub 'arn:aws:s3:::${UsageReportBucket}/*'
+              - Effect: Allow
+                Action:
+                  - 'athena:StartQueryExecution'
+                  - 'athena:GetQueryExecution'
+                Resource:
+                  - '*'
   LambdaInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
@@ -487,24 +502,6 @@ Resources:
       Action: 'lambda:InvokeFunction'
       Principal: 'events.amazonaws.com'
       SourceArn: !GetAtt AggregationRule.Arn
-  LambdaExecutionRolePolicy:
-    Type: "AWS::IAM::ManagedPolicy"
-    Properties:
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-        - Effect: Allow
-          Action:
-          - "s3:GetObject"
-          - "s3:PutObject"
-          Resource:
-          - !Sub 'arn:aws:s3:::${UsageReportBucket}/*'
-        - Effect: Allow
-          Action:
-            - athena:StartQueryExecution
-            - athena:GetQueryExecution
-          Resource:
-          - '*'
   AggregationLambda:
     Type: AWS::Lambda::Function
     Properties:
