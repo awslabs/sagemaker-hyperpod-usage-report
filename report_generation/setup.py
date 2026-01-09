@@ -9,6 +9,7 @@ setup(
         "boto3>=1.26.0",
         "pandas>=1.5.0",
         "awswrangler>=3.0.0",
+        "pyarrow==20.0.0",
         "fpdf>=1.7.2",
     ],
     python_requires=">=3.8",
