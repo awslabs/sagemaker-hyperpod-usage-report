@@ -1,9 +1,11 @@
 import pandas as pd
 
 from .base import BaseReportGenerator
+from ..utils.util import has_mig_usage
 
 
 class CSVReportGenerator(BaseReportGenerator):
+
     def generate_report_header(self, header_info: dict) -> list:
         """Generate standard report header"""
         time_period = f"{header_info['start_date']} to {header_info['end_date']}"
@@ -36,33 +38,67 @@ class CSVReportGenerator(BaseReportGenerator):
     ) -> str:
         """Generate CSV Summary report"""
         output_file = self._build_filename(header_info, self.CSV_EXTENSION)
+        
+        has_mig = has_mig_usage(df, False)
 
         # Column headers (multi-level)
-        resource_headers = [
-            ",,,Instance,NeuronCore,,,GPU,,,vCPU,,",
-            "Date,Namespace,Team,Type,Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
-            + "Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
-            + "Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours)",
-        ]
+        if has_mig:
+            resource_headers = [
+                ",,,Instance,NeuronCore,,,GPU,,,vCPU,,,MIG Profile,MIG,,",
+                "Date,Namespace,Team,Type,Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
+                + "Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
+                + "Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
+                + "Profile,Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours)",
+            ]
+        else:
+            resource_headers = [
+                ",,,Instance,NeuronCore,,,GPU,,,vCPU,,",
+                "Date,Namespace,Team,Type,Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
+                + "Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours),"
+                + "Total utilization (hours),Allocated utilization (hours),Borrowed utilization (hours)",
+            ]
 
         # Reorder DataFrame columns to match desired output
-        df = df[
-            [
-                "report_date",
-                "namespace",
-                "team",
-                "instance_type",
-                "total_neuron_core_utilization_hours",
-                "allocated_neuron_core_utilization_hours",
-                "borrowed_neuron_core_utilization_hours",
-                "total_gpu_utilization_hours",
-                "allocated_gpu_utilization_hours",
-                "borrowed_gpu_utilization_hours",
-                "total_vcpu_utilization_hours",
-                "allocated_vcpu_utilization_hours",
-                "borrowed_vcpu_utilization_hours",
+        if has_mig:
+            df = df[
+                [
+                    "report_date",
+                    "namespace",
+                    "team",
+                    "instance_type",
+                    "total_neuron_core_utilization_hours",
+                    "allocated_neuron_core_utilization_hours",
+                    "borrowed_neuron_core_utilization_hours",
+                    "total_gpu_utilization_hours",
+                    "allocated_gpu_utilization_hours",
+                    "borrowed_gpu_utilization_hours",
+                    "total_vcpu_utilization_hours",
+                    "allocated_vcpu_utilization_hours",
+                    "borrowed_vcpu_utilization_hours",
+                    "mig_profile",
+                    "total_mig_utilization_hours",
+                    "allocated_mig_utilization_hours",
+                    "borrowed_mig_utilization_hours",
+                ]
             ]
-        ]
+        else:
+            df = df[
+                [
+                    "report_date",
+                    "namespace",
+                    "team",
+                    "instance_type",
+                    "total_neuron_core_utilization_hours",
+                    "allocated_neuron_core_utilization_hours",
+                    "borrowed_neuron_core_utilization_hours",
+                    "total_gpu_utilization_hours",
+                    "allocated_gpu_utilization_hours",
+                    "borrowed_gpu_utilization_hours",
+                    "total_vcpu_utilization_hours",
+                    "allocated_vcpu_utilization_hours",
+                    "borrowed_vcpu_utilization_hours",
+                ]
+            ]
 
         # Write to file
         with open(output_file, "w") as f:
@@ -104,6 +140,13 @@ class CSVReportGenerator(BaseReportGenerator):
                         f"{row['allocated_vcpu_utilization_hours']:.2f}",
                         f"{row['borrowed_vcpu_utilization_hours']:.2f}",
                     ]
+                    if has_mig:
+                        formatted_row.extend([
+                            str(row["mig_profile"]) if pd.notna(row["mig_profile"]) else "",
+                            f"{row['total_mig_utilization_hours']:.2f}" if pd.notna(row['total_mig_utilization_hours']) else "0.00",
+                            f"{row['allocated_mig_utilization_hours']:.2f}" if pd.notna(row['allocated_mig_utilization_hours']) else "0.00",
+                            f"{row['borrowed_mig_utilization_hours']:.2f}" if pd.notna(row['borrowed_mig_utilization_hours']) else "0.00",
+                        ])
                     f.write(",".join(formatted_row) + "\n")
 
         return output_file
@@ -113,35 +156,69 @@ class CSVReportGenerator(BaseReportGenerator):
     ) -> str:
         """Generate CSV Detailed report"""
         output_file = self._build_filename(header_info, self.CSV_EXTENSION)
+        
+        has_mig = has_mig_usage(df, True)
 
         # Column headers (multi-level)
-        resource_headers = [
-            ",,,,,,NeuronCore,,GPU,,vCPU,,",
-            "Date,Period Start,Period End,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
-            + "Total utilization (count),Total utilization (hours),Total utilization (count),"
-            + "Total utilization (hours),Total utilization (count),Priority class",
-        ]
+        if has_mig:
+            resource_headers = [
+                ",,,,,,NeuronCore,,GPU,,vCPU,,,MIG Profile,MIG,,",
+                "Date,Period Start,Period End,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
+                + "Total utilization (count),Total utilization (hours),Total utilization (count),"
+                + "Total utilization (hours),Total utilization (count),Profile,Total utilization (hours),Total utilization (count),Priority class",
+            ]
+        else:
+            resource_headers = [
+                ",,,,,,NeuronCore,,GPU,,vCPU,,",
+                "Date,Period Start,Period End,Namespace,Team,Task,Instance,Status,Total utilization (hours),"
+                + "Total utilization (count),Total utilization (hours),Total utilization (count),"
+                + "Total utilization (hours),Total utilization (count),Priority class",
+            ]
 
         # Reorder DataFrame columns to match desired output
-        df = df[
-            [
-                "report_date",
-                "period_start",
-                "period_end",
-                "namespace",
-                "team",
-                "task_name",
-                "instance",
-                "status",
-                "utilized_neuron_core_hours",
-                "utilized_neuron_core_count",
-                "utilized_gpu_hours",
-                "utilized_gpu_count",
-                "utilized_vcpu_hours",
-                "utilized_vcpu_count",
-                "priority_class",
+        if has_mig:
+            df = df[
+                [
+                    "report_date",
+                    "period_start",
+                    "period_end",
+                    "namespace",
+                    "team",
+                    "task_name",
+                    "instance",
+                    "status",
+                    "utilized_neuron_core_hours",
+                    "utilized_neuron_core_count",
+                    "utilized_gpu_hours",
+                    "utilized_gpu_count",
+                    "utilized_vcpu_hours",
+                    "utilized_vcpu_count",
+                    "mig_profile",
+                    "utilized_mig_hours",
+                    "utilized_mig_count",
+                    "priority_class",
+                ]
             ]
-        ]
+        else:
+            df = df[
+                [
+                    "report_date",
+                    "period_start",
+                    "period_end",
+                    "namespace",
+                    "team",
+                    "task_name",
+                    "instance",
+                    "status",
+                    "utilized_neuron_core_hours",
+                    "utilized_neuron_core_count",
+                    "utilized_gpu_hours",
+                    "utilized_gpu_count",
+                    "utilized_vcpu_hours",
+                    "utilized_vcpu_count",
+                    "priority_class",
+                ]
+            ]
 
         # Write to file
         with open(output_file, "w") as f:
@@ -183,8 +260,14 @@ class CSVReportGenerator(BaseReportGenerator):
                         f"{row['utilized_gpu_count']:.2f}",
                         f"{row['utilized_vcpu_hours']:.2f}",
                         f"{row['utilized_vcpu_count']:.2f}",
-                        row["priority_class"],
                     ]
+                    if has_mig:
+                        formatted_row.extend([
+                            str(row["mig_profile"]) if pd.notna(row["mig_profile"]) else "",
+                            f"{row['utilized_mig_hours']:.2f}" if pd.notna(row['utilized_mig_hours']) else "0.00",
+                            f"{row['utilized_mig_count']:.2f}" if pd.notna(row['utilized_mig_count']) else "0.00",
+                        ])
+                    formatted_row.append(row["priority_class"])
                     f.write(",".join(formatted_row) + "\n")
 
         return output_file

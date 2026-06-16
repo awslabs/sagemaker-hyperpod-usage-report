@@ -5,6 +5,7 @@ import pandas as pd
 from fpdf import FPDF
 
 from .base import BaseReportGenerator
+from ..utils.util import has_mig_usage, filter_zero_usage_rows
 
 
 @dataclass
@@ -26,17 +27,30 @@ class PDFStyle:
 class PDFReportGenerator(BaseReportGenerator):
     def __init__(self):
         self._setup_column_configs()
+    
+
+    
+
+    
+    def _remove_duplicate_rows(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Remove duplicate rows from the dataframe"""
+        if df.empty:
+            return df
+        return df.drop_duplicates().reset_index(drop=True)
+    
+
 
     def _setup_column_configs(self):
         """Initialize column configurations and table headers for both report types"""
+        # Detailed report columns without MIG
         self.detailed_columns = [
             ColumnConfig("report_date", 20, lambda x: x.strftime("%Y-%m-%d")),
             ColumnConfig("period_start", 20, lambda x: x.strftime("%H:%M:%S")),
             ColumnConfig("period_end", 20, lambda x: x.strftime("%H:%M:%S")),
-            ColumnConfig("namespace", 40),
-            ColumnConfig("team", 20),
-            ColumnConfig("task_name", 70),
-            ColumnConfig("instance", 20),
+            ColumnConfig("namespace", 32),
+            ColumnConfig("team", 14),
+            ColumnConfig("task_name", 65),
+            ColumnConfig("instance", 25),
             ColumnConfig("status", 20),
             *[
                 ColumnConfig(f, 21, lambda x: f"{x:.2f}")
@@ -49,7 +63,34 @@ class PDFReportGenerator(BaseReportGenerator):
                     "utilized_vcpu_count",
                 ]
             ],
-            ColumnConfig("priority_class", 25),
+            ColumnConfig("priority_class", 26),
+        ]
+        
+        # Detailed report columns with MIG
+        self.detailed_columns_with_mig = [
+            ColumnConfig("report_date", 18, lambda x: x.strftime("%Y-%m-%d")),
+            ColumnConfig("period_start", 18, lambda x: x.strftime("%H:%M:%S")),
+            ColumnConfig("period_end", 18, lambda x: x.strftime("%H:%M:%S")),
+            ColumnConfig("namespace", 30),
+            ColumnConfig("team", 12),
+            ColumnConfig("task_name", 55),
+            ColumnConfig("instance", 23),
+            ColumnConfig("status", 18),
+            *[
+                ColumnConfig(f, 19, lambda x: f"{x:.2f}")
+                for f in [
+                    "utilized_neuron_core_hours",
+                    "utilized_neuron_core_count",
+                    "utilized_gpu_hours",
+                    "utilized_gpu_count",
+                    "utilized_vcpu_hours",
+                    "utilized_vcpu_count",
+                ]
+            ],
+            ColumnConfig("mig_profile", 18, lambda x: str(x) if pd.notna(x) and x != "" else ""),
+            ColumnConfig("utilized_mig_hours", 19, lambda x: f"{x:.2f}" if pd.notna(x) else "0.00"),
+            ColumnConfig("utilized_mig_count", 19, lambda x: f"{x:.2f}" if pd.notna(x) else "0.00"),
+            ColumnConfig("priority_class", 24),
         ]
 
         self.detailed_table_headers = [
@@ -67,16 +108,37 @@ class PDFReportGenerator(BaseReportGenerator):
             "Total\nutilization\n(count)",
             "Total\nutilization\n(hours)",
             "Total\nutilization\n(count)",
-            "Priority Class",
+            "Priority\nClass",
+        ]
+        
+        self.detailed_table_headers_with_mig = [
+            "Date",
+            "Period Start",
+            "Period End",
+            "Namespace",
+            "Team",
+            "Task",
+            "Instance",
+            "Status",
+            "Total\nutilization\n(hours)",
+            "Total\nutilization\n(count)",
+            "Total\nutilization\n(hours)",
+            "Total\nutilization\n(count)",
+            "Total\nutilization\n(hours)",
+            "Total\nutilization\n(count)",
+            "MIG\nProfile",
+            "Total\nutilization\n(hours)",
+            "Total\nutilization\n(count)",
+            "Priority\nClass",
         ]
 
         self.summary_columns = [
-            ColumnConfig("report_date", 20, lambda x: x.strftime("%Y-%m-%d")),
-            ColumnConfig("namespace", 50),
-            ColumnConfig("team", 50),
-            ColumnConfig("instance_type", 30),
+            ColumnConfig("report_date", 18, lambda x: x.strftime("%Y-%m-%d")),
+            ColumnConfig("namespace", 32),
+            ColumnConfig("team", 20),
+            ColumnConfig("instance_type", 26),
             *[
-                ColumnConfig(f, 25, lambda x: f"{x:.2f}")
+                ColumnConfig(f, 22, lambda x: f"{x:.2f}")
                 for f in [
                     "total_neuron_core_utilization_hours",
                     "allocated_neuron_core_utilization_hours",
@@ -89,6 +151,32 @@ class PDFReportGenerator(BaseReportGenerator):
                     "borrowed_vcpu_utilization_hours",
                 ]
             ],
+        ]
+        
+        # Summary report columns with MIG
+        self.summary_columns_with_mig = [
+            ColumnConfig("report_date", 16, lambda x: x.strftime("%Y-%m-%d")),
+            ColumnConfig("namespace", 28),
+            ColumnConfig("team", 18),
+            ColumnConfig("instance_type", 22),
+            *[
+                ColumnConfig(f, 20, lambda x: f"{x:.2f}")
+                for f in [
+                    "total_neuron_core_utilization_hours",
+                    "allocated_neuron_core_utilization_hours",
+                    "borrowed_neuron_core_utilization_hours",
+                    "total_gpu_utilization_hours",
+                    "allocated_gpu_utilization_hours",
+                    "borrowed_gpu_utilization_hours",
+                    "total_vcpu_utilization_hours",
+                    "allocated_vcpu_utilization_hours",
+                    "borrowed_vcpu_utilization_hours",
+                ]
+            ],
+            ColumnConfig("mig_profile", 16, lambda x: str(x) if pd.notna(x) else ""),
+            ColumnConfig("total_mig_utilization_hours", 20, lambda x: f"{x:.2f}" if pd.notna(x) else "0.00"),
+            ColumnConfig("allocated_mig_utilization_hours", 20, lambda x: f"{x:.2f}" if pd.notna(x) else "0.00"),
+            ColumnConfig("borrowed_mig_utilization_hours", 20, lambda x: f"{x:.2f}" if pd.notna(x) else "0.00"),
         ]
 
         self.summary_table_headers = [
@@ -106,6 +194,26 @@ class PDFReportGenerator(BaseReportGenerator):
             "Allocated\nutilization\n(hours)",
             "Borrowed\nutilization\n(hours)",
         ]
+        
+        self.summary_table_headers_with_mig = [
+            "Date",
+            "Namespace",
+            "Team",
+            "Type",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
+            "MIG\nProfile",
+            "Total\nutilization\n(hours)",
+            "Allocated\nutilization\n(hours)",
+            "Borrowed\nutilization\n(hours)",
+        ]
 
     def _create_pdf(self) -> FPDF:
         """Initialize PDF object with standard settings"""
@@ -118,21 +226,24 @@ class PDFReportGenerator(BaseReportGenerator):
         x_start = pdf.get_x()
         y_start = pdf.get_y()
 
-        # Print the cell content
-        pdf.multi_cell(
-            width,
-            height / 3 if "\n" in text else height / 2 if "Period" in text else height,
-            text,
-            0,
-            "C",
-            True,
-        )
+        pdf.rect(x_start, y_start, width, height, 'F')
+        if "\n" not in text:
+            pdf.cell(width, height, text, 0, 0, "C")
+        else:
+            pdf.multi_cell(
+                width,
+                height / 3,
+                text,
+                0,
+                "C",
+                False,
+            )
 
         # Return to the right of the cell
         pdf.set_xy(x_start + width, y_start)
 
         # Draw the border
-        pdf.rect(x_start, y_start, width, height)
+        pdf.rect(x_start, y_start, width, height, 'D')
 
     def _add_base_header(
         self, pdf: FPDF, header_info: Dict[str, Any]
@@ -245,6 +356,7 @@ class PDFReportGenerator(BaseReportGenerator):
         columns: List[ColumnConfig],
         headers: List[str],
         is_detailed: bool,
+        has_mig: bool,
     ) -> None:
         """Add table headers with correct group formatting"""
         pdf.set_fill_color(*PDFStyle.HEADER_BG_COLOR)
@@ -259,6 +371,11 @@ class PDFReportGenerator(BaseReportGenerator):
             pdf.cell(metric_width, 10, "NeuronCore", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "GPU", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "vCPU", 1, 0, "C", True)
+            if has_mig:
+                mig_profile_width = columns[14].width
+                mig_metric_width = columns[15].width * 2
+                pdf.cell(mig_profile_width, 10, "", 1, 0, "C", True)
+                pdf.cell(mig_metric_width, 10, "MIG", 1, 0, "C", True)
             pdf.cell(columns[-1].width, 10, "", 1, 1, "C", True)
         else:
             base_width = sum(col.width for col in columns[:3])
@@ -268,7 +385,14 @@ class PDFReportGenerator(BaseReportGenerator):
             pdf.cell(type_width, 10, "Instance", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "NeuronCore", 1, 0, "C", True)
             pdf.cell(metric_width, 10, "GPU", 1, 0, "C", True)
-            pdf.cell(metric_width, 10, "vCPU", 1, 1, "C", True)
+            pdf.cell(metric_width, 10, "vCPU", 1, 0, "C", True)
+            if has_mig:
+                mig_profile_width = columns[13].width
+                mig_metric_width = columns[14].width * 3
+                pdf.cell(mig_profile_width, 10, "", 1, 0, "C", True)
+                pdf.cell(mig_metric_width, 10, "MIG", 1, 1, "C", True)
+            else:
+                pdf.ln()
 
         # Second row: Column headers
         pdf.set_draw_color(0, 0, 0)
@@ -285,10 +409,21 @@ class PDFReportGenerator(BaseReportGenerator):
         """Add table content rows"""
         pdf.set_font(*PDFStyle.CONTENT_FONT)
         for _, row in df.iterrows():
-            for col in columns:
+            x_start = pdf.get_x()
+            y_start = pdf.get_y()
+            
+            for i, col in enumerate(columns):
                 value = row[col.name]
                 formatted_value = col.formatter(value)
-                pdf.cell(col.width, 10, formatted_value, 1)
+                
+                # Set position for this cell
+                x_pos = x_start + sum(c.width for c in columns[:i])
+                pdf.set_xy(x_pos, y_start)
+                
+                # Use cell for consistent height and alignment
+                pdf.cell(col.width, 10, formatted_value, 1, 0, "L")
+            
+            # Move to next row
             pdf.ln()
 
     def _generate_report(
@@ -299,6 +434,7 @@ class PDFReportGenerator(BaseReportGenerator):
         headers: List[str],
         is_detailed: bool,
         missing_periods: list,
+        has_mig: bool,
     ) -> str:
         """Generate a PDF report with the specified format"""
         output_file = self._build_filename(header_info, self.PDF_EXTENSION)
@@ -307,7 +443,7 @@ class PDFReportGenerator(BaseReportGenerator):
         # Check if there's data to display
         if df.empty:
             self._add_report_header(pdf, header_info, missing_periods)
-            self._add_table_headers(pdf, columns, headers, is_detailed)
+            self._add_table_headers(pdf, columns, headers, is_detailed, has_mig)
             pdf.set_font(*PDFStyle.HEADER_FONT)
             pdf.cell(0, 20, "No Results", ln=True, align="C")
         else:
@@ -326,11 +462,11 @@ class PDFReportGenerator(BaseReportGenerator):
                     else:
                         self._add_report_header(pdf, header_info, missing_periods, namespace)
                     
-                    self._add_table_headers(pdf, columns, headers, is_detailed)
+                    self._add_table_headers(pdf, columns, headers, is_detailed, has_mig)
                     self._add_table_content(pdf, namespace_data, columns)
             else:
                 self._add_report_header(pdf, header_info, missing_periods)
-                self._add_table_headers(pdf, columns, headers, is_detailed)
+                self._add_table_headers(pdf, columns, headers, is_detailed, has_mig)
                 self._add_table_content(pdf, df, columns)
         
         pdf.output(output_file)
@@ -340,24 +476,38 @@ class PDFReportGenerator(BaseReportGenerator):
         self, df: pd.DataFrame, header_info: Dict[str, Any], missing_periods: list
     ) -> str:
         """Generate a detailed PDF report"""
+        df = filter_zero_usage_rows(df, True)
+        df = self._remove_duplicate_rows(df)
+        has_mig = has_mig_usage(df, True)
+        columns = self.detailed_columns_with_mig if has_mig else self.detailed_columns
+        headers = self.detailed_table_headers_with_mig if has_mig else self.detailed_table_headers
+        
         return self._generate_report(
             df,
             header_info,
-            self.detailed_columns,
-            self.detailed_table_headers,
+            columns,
+            headers,
             True,
             missing_periods,
+            has_mig,
         )
 
     def generate_summary_report(
         self, df: pd.DataFrame, header_info: Dict[str, Any], missing_periods: list
     ) -> str:
         """Generate a summary PDF report"""
+        df = filter_zero_usage_rows(df, False)
+        df = self._remove_duplicate_rows(df)
+        has_mig = has_mig_usage(df, False)
+        columns = self.summary_columns_with_mig if has_mig else self.summary_columns
+        headers = self.summary_table_headers_with_mig if has_mig else self.summary_table_headers
+        
         return self._generate_report(
             df,
             header_info,
-            self.summary_columns,
-            self.summary_table_headers,
+            columns,
+            headers,
             False,
             missing_periods,
+            has_mig,
         )

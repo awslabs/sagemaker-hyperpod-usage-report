@@ -168,7 +168,7 @@ def test_add_table_headers(mock_pdf):
 
     # Test summary headers
     generator._add_table_headers(
-        mock_pdf, generator.summary_columns, generator.summary_table_headers, False
+        mock_pdf, generator.summary_columns, generator.summary_table_headers, False, False
     )
     assert mock_pdf.set_fill_color.called
     assert mock_pdf.cell.called
@@ -178,7 +178,7 @@ def test_add_table_headers(mock_pdf):
 
     # Test detailed headers
     generator._add_table_headers(
-        mock_pdf, generator.detailed_columns, generator.detailed_table_headers, True
+        mock_pdf, generator.detailed_columns, generator.detailed_table_headers, True, False
     )
     assert mock_pdf.set_fill_color.called
     assert mock_pdf.cell.called
@@ -322,3 +322,72 @@ def test_generate_report_with_multiple_teams(mock_fpdf, header_info, empty_missi
     mock_fpdf.return_value.add_page.assert_called()
     # Should be called 3 times total: 1 initial from _create_pdf + 2 for page breaks (namespaces 2 and 3)
     assert mock_fpdf.return_value.add_page.call_count == 3
+
+@pytest.fixture
+def summary_df_with_mig():
+    return pd.DataFrame({
+        "report_date": [datetime.strptime("2025-03-25", "%Y-%m-%d")],
+        "namespace": ["test-namespace"],
+        "team": ["test-team"],
+        "instance_type": ["ml.p4d.24xlarge"],
+        "total_neuron_core_utilization_hours": [1.0],
+        "allocated_neuron_core_utilization_hours": [0.5],
+        "borrowed_neuron_core_utilization_hours": [0.5],
+        "total_gpu_utilization_hours": [2.0],
+        "allocated_gpu_utilization_hours": [1.0],
+        "borrowed_gpu_utilization_hours": [1.0],
+        "total_vcpu_utilization_hours": [3.0],
+        "allocated_vcpu_utilization_hours": [1.5],
+        "borrowed_vcpu_utilization_hours": [1.5],
+        "mig_profile": ["1g.5gb"],
+        "total_mig_utilization_hours": [4.0],
+        "allocated_mig_utilization_hours": [2.0],
+        "borrowed_mig_utilization_hours": [2.0],
+    })
+
+
+@pytest.fixture
+def detailed_df_with_mig():
+    return pd.DataFrame({
+        "report_date": [datetime.strptime("2025-03-25", "%Y-%m-%d")],
+        "namespace": ["test-namespace"],
+        "period_start": [datetime.strptime("20:00:00", "%H:%M:%S")],
+        "period_end": [datetime.strptime("21:00:00", "%H:%M:%S")],
+        "team": ["test-team"],
+        "task_name": ["test-task"],
+        "instance": ["instance-1"],
+        "status": ["Running"],
+        "utilized_neuron_core_hours": [1.0],
+        "utilized_neuron_core_count": [2],
+        "utilized_gpu_hours": [2.0],
+        "utilized_gpu_count": [1],
+        "utilized_vcpu_hours": [3.0],
+        "utilized_vcpu_count": [4],
+        "priority_class": ["high"],
+        "labels": [""],
+        "mig_profile": ["1g.5gb"],
+        "utilized_mig_hours": [4.0],
+        "utilized_mig_count": [2],
+    })
+
+
+def test_has_mig_usage(summary_df_with_mig):
+    generator = PDFReportGenerator()
+    assert generator._has_mig_usage(summary_df_with_mig, False) is True
+
+
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
+def test_generate_summary_report_with_mig(mock_fpdf, summary_df_with_mig, header_info, empty_missing_periods):
+    generator = PDFReportGenerator()
+    output_file = generator.generate_summary_report(summary_df_with_mig, header_info, empty_missing_periods)
+    assert output_file == "summary-report-2025-03-25.pdf"
+    mock_fpdf.return_value.output.assert_called_once_with(output_file)
+
+
+@patch("src.hyperpod_usage_report.generators.pdf_generator.FPDF")
+def test_generate_detailed_report_with_mig(mock_fpdf, detailed_df_with_mig, header_info, empty_missing_periods):
+    generator = PDFReportGenerator()
+    header_info["report_type"] = "detailed"
+    output_file = generator.generate_detailed_report(detailed_df_with_mig, header_info, empty_missing_periods)
+    assert output_file == "detailed-report-2025-03-25.pdf"
+    mock_fpdf.return_value.output.assert_called_once_with(output_file)
